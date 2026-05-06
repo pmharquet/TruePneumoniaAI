@@ -4,4 +4,5 @@ opencv-python
 numpy
 fastapi
 uvicorn[standard]
+python-multipart
 cupy-cuda12x
