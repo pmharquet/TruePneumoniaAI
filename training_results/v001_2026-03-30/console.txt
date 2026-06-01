@@ -1,0 +1,91 @@
+(.venv) PS D:\Docker\TruePneumoniaAI\ai> py .\main_train.py
+[xp] Backend GPU : CuPy  (NVIDIA GeForce RTX 5080)
+=======================================================
+  TruePneumoniaAI — Entraînement
+=======================================================
+  Backend : GPU (CuPy — RTX 5080)
+  Batch size : 8 images
+[Dashboard] Serveur démarré → http://localhost:8000/
+
+[1] Indexation du dataset…
+  Chargement Train : 15000 images…
+    15000/15000
+  Chargement Val : 640 images…
+    640/640
+  Train : 15000 images  |  Val : 640 images
+
+[2] Construction du réseau…
+     GAP → 48 canaux  |  FC(48→128)  |  FC(128→3)
+
+[3] Entraînement : 30 epochs — 15000 images (1875 batches/epoch)
+     LR=0.001  momentum=0.9  filtres=48  batch=8
+=======================================================
+  Epoch 01 | 15000/15000 | Loss=1.1624 | Acc=0.469 | 32.6img/s | ETA epoch 0minnn
+  Epoch 01/30 | Loss train=1.1624 val=1.0284 | Acc train=0.469 val=0.512 | 460.0s
+  → Meilleur modèle sauvegardé (epoch 1, val_acc=0.512)
+  Epoch 02 | 15000/15000 | Loss=0.8953 | Acc=0.564 | 32.6img/s | ETA epoch 0min
+  Epoch 02/30 | Loss train=0.8953 val=0.8533 | Acc train=0.564 val=0.694 | 460.3s
+  → Meilleur modèle sauvegardé (epoch 2, val_acc=0.694)
+  Epoch 03 | 15000/15000 | Loss=0.7899 | Acc=0.627 | 33.0img/s | ETA epoch 0min
+  Epoch 03/30 | Loss train=0.7899 val=0.7059 | Acc train=0.627 val=0.756 | 453.9s
+  → Meilleur modèle sauvegardé (epoch 3, val_acc=0.756)
+  Epoch 04 | 15000/15000 | Loss=0.7377 | Acc=0.661 | 32.1img/s | ETA epoch 0min
+  Epoch 04/30 | Loss train=0.7377 val=0.6649 | Acc train=0.661 val=0.800 | 467.0s
+  → Meilleur modèle sauvegardé (epoch 4, val_acc=0.800)
+  Epoch 05 | 15000/15000 | Loss=0.6891 | Acc=0.691 | 32.8img/s | ETA epoch 0min
+  Epoch 05/30 | Loss train=0.6891 val=0.8097 | Acc train=0.691 val=0.713 | 457.4s
+  Epoch 06 | 15000/15000 | Loss=0.6446 | Acc=0.706 | 33.8img/s | ETA epoch 0min
+  Epoch 06/30 | Loss train=0.6446 val=0.6862 | Acc train=0.706 val=0.739 | 443.5s
+  Epoch 07 | 15000/15000 | Loss=0.6270 | Acc=0.726 | 33.7img/s | ETA epoch 0min
+  Epoch 07/30 | Loss train=0.6270 val=0.6948 | Acc train=0.726 val=0.798 | 445.7s
+  Epoch 08 | 15000/15000 | Loss=0.5982 | Acc=0.734 | 33.5img/s | ETA epoch 0min
+  Epoch 08/30 | Loss train=0.5982 val=0.9890 | Acc train=0.734 val=0.702 | 448.4s
+  Epoch 09 | 15000/15000 | Loss=0.5780 | Acc=0.744 | 33.6img/s | ETA epoch 0min
+  Epoch 09/30 | Loss train=0.5780 val=0.9787 | Acc train=0.744 val=0.669 | 446.6s
+  Epoch 10 | 15000/15000 | Loss=0.5673 | Acc=0.746 | 33.4img/s | ETA epoch 0min
+  Epoch 10/30 | Loss train=0.5673 val=0.6389 | Acc train=0.746 val=0.787 | 449.0s
+  Epoch 11 | 15000/15000 | Loss=0.5576 | Acc=0.751 | 33.5img/s | ETA epoch 0min
+  Epoch 11/30 | Loss train=0.5576 val=0.8171 | Acc train=0.751 val=0.773 | 448.3s
+  Epoch 12 | 15000/15000 | Loss=0.5441 | Acc=0.755 | 33.5img/s | ETA epoch 0min
+  Epoch 12/30 | Loss train=0.5441 val=0.5868 | Acc train=0.755 val=0.823 | 447.6s
+  → Meilleur modèle sauvegardé (epoch 12, val_acc=0.823)
+  Epoch 13 | 15000/15000 | Loss=0.5304 | Acc=0.762 | 33.6img/s | ETA epoch 0min
+  Epoch 13/30 | Loss train=0.5304 val=0.6866 | Acc train=0.762 val=0.795 | 447.1s
+  Epoch 14 | 15000/15000 | Loss=0.5224 | Acc=0.766 | 33.6img/s | ETA epoch 0min
+  Epoch 14/30 | Loss train=0.5224 val=0.6716 | Acc train=0.766 val=0.817 | 446.6s
+  Epoch 15 | 15000/15000 | Loss=0.5137 | Acc=0.771 | 33.6img/s | ETA epoch 0min
+  Epoch 15/30 | Loss train=0.5137 val=0.7163 | Acc train=0.771 val=0.811 | 446.2s
+  Epoch 16 | 15000/15000 | Loss=0.4976 | Acc=0.777 | 33.6img/s | ETA epoch 0min
+  Epoch 16/30 | Loss train=0.4976 val=0.7164 | Acc train=0.777 val=0.786 | 446.1s
+  Epoch 17 | 15000/15000 | Loss=0.4992 | Acc=0.775 | 33.6img/s | ETA epoch 0min
+  Epoch 17/30 | Loss train=0.4992 val=0.8047 | Acc train=0.775 val=0.775 | 446.1s
+  Epoch 18 | 15000/15000 | Loss=0.4851 | Acc=0.783 | 33.6img/s | ETA epoch 0min
+  Epoch 18/30 | Loss train=0.4851 val=0.7650 | Acc train=0.783 val=0.787 | 446.2s
+  Epoch 19 | 15000/15000 | Loss=0.4798 | Acc=0.780 | 33.6img/s | ETA epoch 0min
+  Epoch 19/30 | Loss train=0.4798 val=0.6906 | Acc train=0.780 val=0.800 | 446.6s
+  Epoch 20 | 15000/15000 | Loss=0.4695 | Acc=0.788 | 33.6img/s | ETA epoch 0min
+  Epoch 20/30 | Loss train=0.4695 val=0.8255 | Acc train=0.788 val=0.787 | 446.4s
+  Epoch 21 | 15000/15000 | Loss=0.4594 | Acc=0.793 | 33.6img/s | ETA epoch 0min
+  Epoch 21/30 | Loss train=0.4594 val=0.9479 | Acc train=0.793 val=0.770 | 446.2s
+  Epoch 22 | 15000/15000 | Loss=0.4575 | Acc=0.792 | 33.6img/s | ETA epoch 0min
+  Epoch 22/30 | Loss train=0.4575 val=0.8869 | Acc train=0.792 val=0.716 | 446.5s
+  Epoch 23 | 15000/15000 | Loss=0.4554 | Acc=0.797 | 33.6img/s | ETA epoch 0min
+  Epoch 23/30 | Loss train=0.4554 val=0.9945 | Acc train=0.797 val=0.769 | 446.5s
+  Epoch 24 | 15000/15000 | Loss=0.4450 | Acc=0.799 | 33.6img/s | ETA epoch 0min
+  Epoch 24/30 | Loss train=0.4450 val=0.7548 | Acc train=0.799 val=0.783 | 446.0s
+  Epoch 25 | 15000/15000 | Loss=0.4408 | Acc=0.801 | 33.5img/s | ETA epoch 0min
+  Epoch 25/30 | Loss train=0.4408 val=0.7655 | Acc train=0.801 val=0.792 | 447.1s
+  Epoch 26 | 15000/15000 | Loss=0.4306 | Acc=0.805 | 33.6img/s | ETA epoch 0min
+  Epoch 26/30 | Loss train=0.4306 val=0.6888 | Acc train=0.805 val=0.806 | 446.0s
+  Epoch 27 | 15000/15000 | Loss=0.4354 | Acc=0.804 | 33.6img/s | ETA epoch 0min
+  Epoch 27/30 | Loss train=0.4354 val=0.9537 | Acc train=0.804 val=0.780 | 445.9s
+  Epoch 28 | 15000/15000 | Loss=0.4262 | Acc=0.807 | 33.7img/s | ETA epoch 0min
+  Epoch 28/30 | Loss train=0.4262 val=1.1382 | Acc train=0.807 val=0.739 | 445.7s
+  Epoch 29 | 15000/15000 | Loss=0.4214 | Acc=0.808 | 33.7img/s | ETA epoch 0min
+  Epoch 29/30 | Loss train=0.4214 val=0.8221 | Acc train=0.808 val=0.803 | 445.5s
+  Epoch 30 | 15000/15000 | Loss=0.4225 | Acc=0.809 | 33.7img/s | ETA epoch 0min
+  Epoch 30/30 | Loss train=0.4225 val=1.0034 | Acc train=0.809 val=0.770 | 445.3s
+
+=======================================================
+  Entraînement terminé
+=======================================================

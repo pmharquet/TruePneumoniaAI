@@ -1,0 +1,59 @@
+[xp] Backend GPU : CuPy  (NVIDIA GeForce RTX 5080)
+=======================================================
+  TruePneumoniaAI — Évaluation
+=======================================================
+
+[1] Construction et chargement du modèle…
+     Checkpoint : epoch 12, val_acc=0.823
+
+[2] Évaluation — Val set…
+  640/640
+
+  Val  —  640 images  |  Acc globale : 0.823
+  Classe         Vrais    Total    Acc
+  ----------------------------------------
+  Normal         187      242      0.773
+  Bactérien      222      250      0.888
+  Viral          118      148      0.797
+
+  Matrice de confusion (lignes=réel, cols=prédit) :
+                  Normal  Bactérien      Viral
+  Normal             187         20         35
+  Bactérien           16        222         12
+  Viral                2         28        118
+
+  Erreurs fréquentes :
+    Normal -> predit Bactérien : 20 fois (8.3%)
+    Normal -> predit Viral : 35 fois (14.5%)
+    Bactérien -> predit Normal : 16 fois (6.4%)
+    Bactérien -> predit Viral : 12 fois (4.8%)
+    Viral -> predit Normal : 2 fois (1.4%)
+    Viral -> predit Bactérien : 28 fois (18.9%)
+
+[3] Evaluation — Train set (detection overfitting par classe)…
+  15000/15000
+
+  Train  —  15000 images  |  Acc globale : 0.773
+  Classe         Vrais    Total    Acc
+  ----------------------------------------
+  Normal         4772     5000     0.954
+  Bactérien      3653     5000     0.731
+  Viral          3174     5000     0.635
+
+  Matrice de confusion (lignes=réel, cols=prédit) :
+                  Normal  Bactérien      Viral
+  Normal            4772         95        133
+  Bactérien          327       3653       1020
+  Viral              428       1398       3174
+
+  Erreurs fréquentes :
+    Normal -> predit Bactérien : 95 fois (1.9%)
+    Normal -> predit Viral : 133 fois (2.7%)
+    Bactérien -> predit Normal : 327 fois (6.5%)
+    Bactérien -> predit Viral : 1020 fois (20.4%)
+    Viral -> predit Normal : 428 fois (8.6%)
+    Viral -> predit Bactérien : 1398 fois (28.0%)
+
+=======================================================
+  Évaluation terminée
+=======================================================

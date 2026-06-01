@@ -1,0 +1,80 @@
+(.venv) PS D:\Docker\TruePneumoniaAI> python .\ai\main_train.py
+[xp] Backend GPU : CuPy  (NVIDIA GeForce RTX 5080)
+=======================================================
+  TruePneumoniaAI — Entraînement
+=======================================================
+  Backend : GPU (CuPy — RTX 5080)
+  Batch size : 8 images
+[Dashboard] Serveur démarré → http://localhost:8000/
+
+[1] Indexation du dataset…
+  Chargement Train : 15000 images…
+    15000/15000
+  Chargement Val : 640 images…
+    640/640
+  Train : 15000 images  |  Val : 640 images
+
+[2] Construction du réseau…
+     GAP → 48 canaux  |  FC(48→128)  |  Dropout(0.5)  |  FC(128→3)
+
+[3] Entraînement : 50 epochs — 15000 images (1875 batches/epoch)
+     LR=0.001→1e-05 (cosine)  momentum=0.9  filtres=48  batch=8
+     Dropout=0.5  EarlyStopping patience=8
+=======================================================
+  Epoch 01 | 15000/15000 | Loss=1.0658 | Acc=0.452 | 33.1img/s | ETA epoch 0minnn
+  Epoch 01/50 | Loss train=1.0658 val=1.3844 | Acc train=0.452 val=0.484 | LR=1.00e-03 | 453.7s
+  -> Meilleur modele sauvegarde (epoch 1, val_acc=0.484)
+  Epoch 02 | 15000/15000 | Loss=0.9103 | Acc=0.531 | 33.3img/s | ETA epoch 0min
+  Epoch 02/50 | Loss train=0.9103 val=1.1983 | Acc train=0.531 val=0.463 | LR=9.99e-04 | 450.3s
+  Epoch 03 | 15000/15000 | Loss=0.8193 | Acc=0.584 | 33.4img/s | ETA epoch 0min
+  Epoch 03/50 | Loss train=0.8193 val=1.0799 | Acc train=0.584 val=0.542 | LR=9.96e-04 | 449.1s
+  -> Meilleur modele sauvegarde (epoch 3, val_acc=0.542)
+  Epoch 04 | 15000/15000 | Loss=0.7527 | Acc=0.630 | 33.5img/s | ETA epoch 0min
+  Epoch 04/50 | Loss train=0.7527 val=1.1708 | Acc train=0.630 val=0.581 | LR=9.91e-04 | 448.1s
+  -> Meilleur modele sauvegarde (epoch 4, val_acc=0.581)
+  Epoch 05 | 15000/15000 | Loss=0.7157 | Acc=0.664 | 28.7img/s | ETA epoch 0min
+  Epoch 05/50 | Loss train=0.7157 val=1.1367 | Acc train=0.664 val=0.619 | LR=9.84e-04 | 523.1s
+  -> Meilleur modele sauvegarde (epoch 5, val_acc=0.619)
+  Epoch 06 | 15000/15000 | Loss=0.6722 | Acc=0.696 | 32.8img/s | ETA epoch 0min
+  Epoch 06/50 | Loss train=0.6722 val=0.7423 | Acc train=0.696 val=0.756 | LR=9.76e-04 | 457.6s
+  -> Meilleur modele sauvegarde (epoch 6, val_acc=0.756)
+  Epoch 07 | 15000/15000 | Loss=0.6384 | Acc=0.716 | 32.7img/s | ETA epoch 0min
+  Epoch 07/50 | Loss train=0.6384 val=0.6743 | Acc train=0.716 val=0.777 | LR=9.65e-04 | 458.2s
+  -> Meilleur modele sauvegarde (epoch 7, val_acc=0.777)
+  Epoch 08 | 15000/15000 | Loss=0.6098 | Acc=0.728 | 32.6img/s | ETA epoch 0min
+  Epoch 08/50 | Loss train=0.6098 val=0.7408 | Acc train=0.728 val=0.758 | LR=9.53e-04 | 459.8s
+  Epoch 09 | 15000/15000 | Loss=0.6011 | Acc=0.730 | 32.6img/s | ETA epoch 0min
+  Epoch 09/50 | Loss train=0.6011 val=0.8751 | Acc train=0.730 val=0.730 | LR=9.39e-04 | 459.7s
+  Epoch 10 | 15000/15000 | Loss=0.5845 | Acc=0.741 | 32.4img/s | ETA epoch 0min
+  Epoch 10/50 | Loss train=0.5845 val=0.9650 | Acc train=0.741 val=0.695 | LR=9.23e-04 | 462.6s
+  Epoch 11 | 15000/15000 | Loss=0.5716 | Acc=0.744 | 32.4img/s | ETA epoch 0min
+  Epoch 11/50 | Loss train=0.5716 val=0.7812 | Acc train=0.744 val=0.775 | LR=9.05e-04 | 463.5s
+  Epoch 12 | 15000/15000 | Loss=0.5558 | Acc=0.752 | 31.3img/s | ETA epoch 0min
+  Epoch 12/50 | Loss train=0.5558 val=0.9592 | Acc train=0.752 val=0.739 | LR=8.86e-04 | 479.0s
+  Epoch 13 | 15000/15000 | Loss=0.5456 | Acc=0.753 | 32.2img/s | ETA epoch 0min
+  Epoch 13/50 | Loss train=0.5456 val=0.9167 | Acc train=0.753 val=0.730 | LR=8.66e-04 | 465.4s
+  Epoch 14 | 15000/15000 | Loss=0.5435 | Acc=0.758 | 17.1img/s | ETA epoch 0min
+  Epoch 14/50 | Loss train=0.5435 val=0.6950 | Acc train=0.758 val=0.797 | LR=8.44e-04 | 876.7s
+  -> Meilleur modele sauvegarde (epoch 14, val_acc=0.797)
+  Epoch 15 | 15000/15000 | Loss=0.5335 | Acc=0.764 | 20.1img/s | ETA epoch 0minn
+  Epoch 15/50 | Loss train=0.5335 val=0.8612 | Acc train=0.764 val=0.736 | LR=8.21e-04 | 746.8s
+  Epoch 16 | 15000/15000 | Loss=0.5199 | Acc=0.771 | 13.9img/s | ETA epoch 0minn
+  Epoch 16/50 | Loss train=0.5199 val=1.1338 | Acc train=0.771 val=0.700 | LR=7.96e-04 | 1079.4s
+  Epoch 17 | 15000/15000 | Loss=0.5174 | Acc=0.770 | 32.2img/s | ETA epoch 0min
+  Epoch 17/50 | Loss train=0.5174 val=0.9342 | Acc train=0.770 val=0.756 | LR=7.70e-04 | 466.3s
+  Epoch 18 | 15000/15000 | Loss=0.5046 | Acc=0.777 | 32.3img/s | ETA epoch 0min
+  Epoch 18/50 | Loss train=0.5046 val=0.8991 | Acc train=0.777 val=0.759 | LR=7.43e-04 | 464.7s
+  Epoch 19 | 15000/15000 | Loss=0.4972 | Acc=0.778 | 32.4img/s | ETA epoch 0min
+  Epoch 19/50 | Loss train=0.4972 val=1.2972 | Acc train=0.778 val=0.672 | LR=7.16e-04 | 463.1s
+  Epoch 20 | 15000/15000 | Loss=0.4891 | Acc=0.785 | 32.5img/s | ETA epoch 0min
+  Epoch 20/50 | Loss train=0.4891 val=0.8534 | Acc train=0.785 val=0.762 | LR=6.87e-04 | 462.1s
+  Epoch 21 | 15000/15000 | Loss=0.4830 | Acc=0.784 | 32.6img/s | ETA epoch 0min
+  Epoch 21/50 | Loss train=0.4830 val=0.8816 | Acc train=0.784 val=0.758 | LR=6.58e-04 | 460.5s
+  Epoch 22 | 15000/15000 | Loss=0.4725 | Acc=0.789 | 31.8img/s | ETA epoch 0min
+  Epoch 22/50 | Loss train=0.4725 val=1.0009 | Acc train=0.789 val=0.741 | LR=6.28e-04 | 471.1s
+
+  [Early Stopping] Pas d'amelioration depuis 8 epochs.
+
+=======================================================
+  Entraînement terminé
+=======================================================

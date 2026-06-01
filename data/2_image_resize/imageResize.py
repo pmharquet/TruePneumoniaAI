@@ -27,7 +27,7 @@ for img in allImage:
     path, size, img_type = img[0], img[1], img[2]
     img = cv2.imread(path)
 
-    w, h = 1320, 968
+    w, h = int(1320/2), int(968/2)
     nexW, nexH = w, h
     borderW, borderH = 0, 0
     originalRatio = size[0] / size[1]

@@ -1,8 +1,13 @@
-import numpy as np
+# Pas d'import numpy/cupy — les opérateurs element-wise fonctionnent
+# de façon identique sur les tableaux NumPy et CuPy.
 
 class RectifiedLinearUnitLayer:
     def __init__(self):
-        pass
+        self._last_input = None
 
     def forward(self, input_data):
-        return np.maximum(0, input_data)
+        self._last_input = input_data
+        return input_data * (input_data > 0)
+
+    def backward(self, grad):
+        return grad * (self._last_input > 0)
