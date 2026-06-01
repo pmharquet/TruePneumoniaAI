@@ -1,0 +1,21 @@
+site_name: TruePneumoniaAI
+site_description: Classification pneumonie sur radiographies thoraciques
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: blue
+    accent: cyan
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Accueil: index.md
+  - Analyse des données: data_analysis.md
+  - Entraînement: training.md
+  - Utilisation du modèle: inference.md
+
+plugins:
+  - search
