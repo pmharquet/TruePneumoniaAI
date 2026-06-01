@@ -32,6 +32,14 @@ pip install -r requirements.txt
 
 ---
 
+## Interface de test
+
+```bash
+python ai\inference_server.py
+```
+
+---
+
 ## Entraînement
 
 ```bash
