@@ -1,0 +1,34 @@
+data:
+  data_dir: "chest_Xray"
+  image_size: 224
+  num_workers: 4
+  batch_size: 32
+
+model:
+  backbone: "densenet121" # densenet121 | resnet50
+  pretrained: true
+  num_classes: 1 # binary: NORMAL vs PNEUMONIA
+  dropout: 0.5
+
+training:
+  max_epochs: 30
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  # pos_weight: weight for PNEUMONIA class (handles imbalance)
+  # computed dynamically from dataset in datamodule
+  precision: "16-mixed" # AMP for faster training on GPU
+
+threshold:
+  # Clinical context: prioritize sensitivity (recall on PNEUMONIA)
+  # Optimal threshold is tuned post-training on val AUC-ROC
+  default: 0.5
+  target_sensitivity: 0.95 # target recall for PNEUMONIA
+
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "TruePneumoniaAI-v0.2"
+
+paths:
+  checkpoints: "checkpoints"
+  onnx_export: "exports/model.onnx"
+  gradcam_output: "outputs/gradcam"
