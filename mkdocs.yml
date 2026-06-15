@@ -15,6 +15,7 @@ nav:
   - Accueil: index.md
   - Analyse des données: data_analysis.md
   - Entraînement: training.md
+  - Dashboard: dashboard.md
   - Utilisation du modèle: inference.md
 
 plugins:

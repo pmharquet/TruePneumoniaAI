@@ -6,6 +6,7 @@ Usage:
 """
 
 import argparse
+import os
 from pathlib import Path
 
 import mlflow
@@ -21,6 +22,7 @@ from pytorch_lightning.loggers import MLFlowLogger
 
 from src.data.datamodule import ChestXrayDataModule
 from src.models.classifier import PneumoniaClassifier
+from src.training.dashboard_callback import DashboardEventLogger
 
 
 def load_config(path: str) -> dict:
@@ -28,7 +30,22 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
+def configure_runtime_cache() -> None:
+    cache_root = Path(os.environ.get("TPAI_CACHE_DIR", "outputs/cache")).resolve()
+    torch_home = Path(os.environ.get("TORCH_HOME", cache_root / "torch")).resolve()
+    xdg_cache = Path(os.environ.get("XDG_CACHE_HOME", cache_root / "xdg")).resolve()
+
+    os.environ.setdefault("TPAI_CACHE_DIR", str(cache_root))
+    os.environ.setdefault("TORCH_HOME", str(torch_home))
+    os.environ.setdefault("XDG_CACHE_HOME", str(xdg_cache))
+    os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
+
+    torch_home.mkdir(parents=True, exist_ok=True)
+    xdg_cache.mkdir(parents=True, exist_ok=True)
+
+
 def train(cfg: dict):
+    configure_runtime_cache()
     pl.seed_everything(42, workers=True)
 
     dm = ChestXrayDataModule(
@@ -70,6 +87,9 @@ def train(cfg: dict):
 
         ckpt_dir = cfg["paths"]["checkpoints"]
         callbacks = [
+            DashboardEventLogger(
+                log_every_n_steps=cfg.get("dashboard", {}).get("log_every_n_steps", 1),
+            ),
             ModelCheckpoint(
                 dirpath=ckpt_dir,
                 filename="best-{epoch:02d}-{val/auroc:.4f}",
@@ -88,9 +108,13 @@ def train(cfg: dict):
             LearningRateMonitor(logging_interval="epoch"),
         ]
 
+        precision = cfg["training"]["precision"]
+        if precision == "16-mixed" and not torch.cuda.is_available():
+            precision = "32-true"
+
         trainer = pl.Trainer(
             max_epochs=cfg["training"]["max_epochs"],
-            precision=cfg["training"]["precision"],
+            precision=precision,
             callbacks=callbacks,
             logger=logger,
             deterministic=True,

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TruePneumoniaAI Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>TruePneumoniaAI</h1>
+        <p>Training dashboard</p>
+      </div>
+      <div class="top-actions">
+        <span id="runStatus" class="status-pill">initialisation</span>
+        <button id="refreshBtn" class="icon-btn" title="Rafraîchir" type="button">
+          <span aria-hidden="true">↻</span>
+          <span>Rafraîchir</span>
+        </button>
+        <a class="icon-btn ghost" href="http://localhost:5000" target="_blank" rel="noreferrer" title="Ouvrir MLflow">
+          <span aria-hidden="true">↗</span>
+          <span>MLflow</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="side-panel">
+        <section class="panel">
+          <div class="section-title">
+            <h2>Lancement</h2>
+          </div>
+          <form id="trainForm" class="control-grid">
+            <label>
+              Dataset
+              <select name="data_dir" id="dataDir"></select>
+            </label>
+            <label>
+              Backbone
+              <select name="backbone">
+                <option value="densenet121">DenseNet121</option>
+                <option value="resnet50">ResNet50</option>
+              </select>
+            </label>
+            <label>
+              Epochs
+              <input name="max_epochs" type="number" min="1" max="200" value="30" />
+            </label>
+            <label>
+              Batch
+              <input name="batch_size" type="number" min="1" max="256" value="32" />
+            </label>
+            <label>
+              Learning rate
+              <input name="learning_rate" type="number" step="0.00001" min="0" value="0.0001" />
+            </label>
+            <label>
+              Workers
+              <input name="num_workers" type="number" min="0" max="16" value="4" />
+            </label>
+            <label>
+              Precision
+              <select name="precision">
+                <option value="16-mixed">16-mixed</option>
+                <option value="32-true">32-true</option>
+              </select>
+            </label>
+            <label>
+              Log steps
+              <input name="log_every_n_steps" type="number" min="1" max="100" value="1" />
+            </label>
+            <label class="check-row">
+              <input name="pretrained" type="checkbox" checked />
+              <span>ImageNet pretrained</span>
+            </label>
+          </form>
+          <div class="button-row">
+            <button id="startBtn" class="primary" type="button">
+              <span aria-hidden="true">▶</span>
+              <span>Démarrer</span>
+            </button>
+            <button id="stopBtn" class="danger" type="button" disabled>
+              <span aria-hidden="true">■</span>
+              <span>Arrêter</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Dataset</h2>
+          </div>
+          <div id="datasetSummary" class="dataset-summary"></div>
+          <div id="sampleGrid" class="sample-grid"></div>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Système</h2>
+          </div>
+          <div id="systemInfo" class="kv"></div>
+        </section>
+      </aside>
+
+      <section class="workspace">
+        <section class="panel progress-panel">
+          <div class="section-title">
+            <h2>Progression</h2>
+            <span id="runDir" class="muted"></span>
+          </div>
+          <div class="progress-grid">
+            <div>
+              <div class="progress-label">
+                <span>Epoch</span>
+                <strong id="epochLabel">0 / 0</strong>
+              </div>
+              <div class="bar"><span id="epochBar"></span></div>
+            </div>
+            <div>
+              <div class="progress-label">
+                <span>Batch</span>
+                <strong id="batchLabel">0 / 0</strong>
+              </div>
+              <div class="bar"><span id="batchBar"></span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="metric-grid">
+          <div class="metric"><span>Train loss</span><strong id="metricTrainLoss">-</strong></div>
+          <div class="metric"><span>Train AUC</span><strong id="metricTrainAuc">-</strong></div>
+          <div class="metric"><span>Val AUC</span><strong id="metricValAuc">-</strong></div>
+          <div class="metric"><span>Sensibilité</span><strong id="metricSensitivity">-</strong></div>
+          <div class="metric"><span>Spécificité</span><strong id="metricSpecificity">-</strong></div>
+          <div class="metric"><span>F1</span><strong id="metricF1">-</strong></div>
+          <div class="metric"><span>Accuracy</span><strong id="metricAccuracy">-</strong></div>
+          <div class="metric"><span>LR</span><strong id="metricLr">-</strong></div>
+        </section>
+
+        <section class="chart-grid">
+          <div class="panel chart-panel">
+            <div class="section-title"><h2>Loss</h2></div>
+            <canvas id="lossChart" width="760" height="260"></canvas>
+          </div>
+          <div class="panel chart-panel">
+            <div class="section-title"><h2>Métriques validation</h2></div>
+            <canvas id="metricChart" width="760" height="260"></canvas>
+          </div>
+        </section>
+
+        <section class="bottom-grid">
+          <div class="panel">
+            <div class="section-title">
+              <h2>Artefacts</h2>
+            </div>
+            <div id="artifacts" class="artifact-list"></div>
+          </div>
+          <div class="panel logs-panel">
+            <div class="section-title">
+              <h2>Logs</h2>
+            </div>
+            <pre id="logs"></pre>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

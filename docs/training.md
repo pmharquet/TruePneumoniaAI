@@ -33,7 +33,19 @@ Modifier ce fichier pour changer de backbone, ajuster le learning rate, etc.
 
 ---
 
-## 2. Lancer l'entraînement
+## 2. Lancer via le dashboard
+
+```bash
+uvicorn src.dashboard.app:app --host 127.0.0.1 --port 8501
+```
+
+Puis ouvrir [http://127.0.0.1:8501](http://127.0.0.1:8501).
+
+Le dashboard permet de choisir `chest_Xray_augmented/`, les hyperparamètres, puis de suivre l'entraînement en temps réel : progression epoch/batch, loss, AUC, sensibilité, spécificité, logs et checkpoints.
+
+---
+
+## 3. Lancer en CLI
 
 ```bash
 python -m src.training.train --config configs/default.yaml
@@ -54,7 +66,7 @@ Ce script :
 
 ---
 
-## 3. Suivre l'entraînement avec MLflow
+## 4. Suivre l'entraînement avec MLflow
 
 ### Lancer l'interface MLflow
 
@@ -63,6 +75,12 @@ mlflow ui --backend-store-uri mlruns
 ```
 
 Puis ouvrir [http://localhost:5000](http://localhost:5000).
+
+Avec les versions récentes de MLflow, si le backend fichier est refusé, définir :
+
+```bash
+$env:MLFLOW_ALLOW_FILE_STORE="true"
+```
 
 ### Ce qui est loggé par run
 
@@ -97,7 +115,7 @@ Puis ouvrir [http://localhost:5000](http://localhost:5000).
 
 ---
 
-## 4. Calibrer le seuil de décision
+## 5. Calibrer le seuil de décision
 
 Après l'entraînement, le seuil par défaut (0.5) n'est pas optimisé cliniquement. Lancer :
 
@@ -126,7 +144,7 @@ Le script :
 
 ---
 
-## 5. Via Docker (API + MLflow)
+## 6. Via Docker (API + MLflow)
 
 ```bash
 docker compose -f docker/docker-compose.yml up
