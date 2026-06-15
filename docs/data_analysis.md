@@ -55,17 +55,27 @@ Ce poids est passé à la `BCEWithLogitsLoss` pour compenser le déséquilibre s
 
 | Transform | Paramètres | Justification |
 |---|---|---|
-| `Resize` | 224×224 | Taille d'entrée ImageNet |
+| `LongestMaxSize` + `PadIfNeeded` | 224×224, ratio conservé | Taille d'entrée ImageNet sans déformation anatomique |
 | `HorizontalFlip` | p=0.5 | Radio thoracique symétrique |
 | `Rotate` | ±15°, p=0.5 | Variabilité de positionnement patient |
 | `RandomBrightnessContrast` | ±0.2, p=0.5 | Variabilité d'exposition |
 | `CLAHE` | clip=2.0, p=0.3 | Rehausse les détails dans les zones pulmonaires denses |
-| `GaussNoise` | var 5–30, p=0.2 | Simule le bruit des capteurs |
+| `GaussNoise` | std 0.01–0.03, p=0.2 | Simule le bruit des capteurs |
 | `Normalize` | mean/std ImageNet | Cohérence avec le backbone pretrained |
 
 ### Validation / Test
 
-Uniquement `Resize` + `Normalize` — pas d'augmentation pour l'évaluation reproductible.
+Uniquement `LongestMaxSize` + `PadIfNeeded` + `Normalize` — pas d'augmentation pour l'évaluation reproductible.
+
+### Génération offline du dataset augmenté
+
+Le script `src.data.generate_augmentations` permet de créer un dataset séparé, sans modifier `chest_Xray/` :
+
+```bash
+python -m src.data.generate_augmentations
+```
+
+Par défaut, il écrit dans `chest_Xray_augmented/`, convertit toutes les images en 224×224 par letterbox avec padding noir, garde `val/` et `test/` sans augmentation, et équilibre `train/` en générant des variantes uniquement pour la classe minoritaire `NORMAL`.
 
 ---
 
