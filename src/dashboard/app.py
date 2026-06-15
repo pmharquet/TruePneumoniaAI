@@ -291,7 +291,7 @@ def _apply_overrides(cfg: dict[str, Any], overrides: dict[str, Any]) -> dict[str
         cfg["training"]["precision"] = overrides["precision"]
 
     cfg.setdefault("dashboard", {})
-    cfg["dashboard"]["log_every_n_steps"] = int(overrides.get("log_every_n_steps") or 1)
+    cfg["dashboard"]["log_every_n_steps"] = int(overrides.get("log_every_n_steps") or 10)
     return cfg
 
 

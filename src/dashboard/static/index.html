@@ -49,7 +49,7 @@
             </label>
             <label>
               Batch
-              <input name="batch_size" type="number" min="1" max="256" value="32" />
+              <input name="batch_size" type="number" min="1" max="512" value="128" />
             </label>
             <label>
               Learning rate
@@ -57,7 +57,7 @@
             </label>
             <label>
               Workers
-              <input name="num_workers" type="number" min="0" max="16" value="4" />
+              <input name="num_workers" type="number" min="0" max="16" value="0" />
             </label>
             <label>
               Precision
@@ -68,7 +68,7 @@
             </label>
             <label>
               Log steps
-              <input name="log_every_n_steps" type="number" min="1" max="100" value="1" />
+              <input name="log_every_n_steps" type="number" min="1" max="100" value="10" />
             </label>
             <label class="check-row">
               <input name="pretrained" type="checkbox" checked />

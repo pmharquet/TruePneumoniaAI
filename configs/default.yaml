@@ -1,8 +1,8 @@
 data:
-  data_dir: "chest_Xray"
+  data_dir: "chest_Xray_augmented"
   image_size: 224
-  num_workers: 4
-  batch_size: 32
+  num_workers: 0
+  batch_size: 128
 
 model:
   backbone: "densenet121" # densenet121 | resnet50

@@ -64,6 +64,7 @@ function renderProject() {
   form.elements.learning_rate.value = cfg.training.learning_rate;
   form.elements.num_workers.value = cfg.data.num_workers;
   form.elements.precision.value = cfg.training.precision;
+  form.elements.log_every_n_steps.value = cfg.dashboard?.log_every_n_steps || 10;
   form.elements.pretrained.checked = Boolean(cfg.model.pretrained);
 
   renderDatasets();

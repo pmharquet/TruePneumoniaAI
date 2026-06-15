@@ -5,13 +5,18 @@ Computes pos_weight from training set counts to handle PNEUMONIA/NORMAL imbalanc
 """
 
 import os
+from pathlib import Path
 
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
 from .dataset import ChestXrayDataset
-from .transforms import get_train_transforms_albumentations, get_val_transforms_albumentations
+from .transforms import (
+    get_preprocessed_transforms_albumentations,
+    get_train_transforms_albumentations,
+    get_val_transforms_albumentations,
+)
 
 
 class ChestXrayDataModule(pl.LightningDataModule):
@@ -42,7 +47,12 @@ class ChestXrayDataModule(pl.LightningDataModule):
         }
 
     def setup(self, stage: str | None = None):
-        train_tf = get_train_transforms_albumentations(self.image_size)
+        is_preprocessed = (Path(self.data_dir) / "augmentation_summary.json").exists()
+        train_tf = (
+            get_preprocessed_transforms_albumentations()
+            if is_preprocessed
+            else get_train_transforms_albumentations(self.image_size)
+        )
         val_tf = get_val_transforms_albumentations(self.image_size)
 
         self.train_dataset = ChestXrayDataset(self.data_dir, "train", transform=train_tf)
