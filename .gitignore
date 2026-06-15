@@ -33,4 +33,5 @@ site/
 
 # Logs / résultats
 outputs/
+outputs/cache/
 training_results/
