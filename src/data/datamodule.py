@@ -4,6 +4,8 @@ PyTorch Lightning DataModule for chest X-ray classification.
 Computes pos_weight from training set counts to handle PNEUMONIA/NORMAL imbalance.
 """
 
+import os
+
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
@@ -29,7 +31,8 @@ class ChestXrayDataModule(pl.LightningDataModule):
 
     def _loader_kwargs(self, shuffle: bool) -> dict:
         use_cuda = torch.cuda.is_available()
-        effective_workers = self.num_workers if use_cuda else 0
+        use_workers = use_cuda and os.name != "nt"
+        effective_workers = self.num_workers if use_workers else 0
         return {
             "batch_size": self.batch_size,
             "shuffle": shuffle,

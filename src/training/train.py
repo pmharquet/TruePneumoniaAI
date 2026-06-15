@@ -47,6 +47,8 @@ def configure_runtime_cache() -> None:
 def train(cfg: dict):
     configure_runtime_cache()
     pl.seed_everything(42, workers=True)
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision("high")
 
     dm = ChestXrayDataModule(
         data_dir=cfg["data"]["data_dir"],
