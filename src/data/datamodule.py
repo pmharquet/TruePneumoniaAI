@@ -27,6 +27,17 @@ class ChestXrayDataModule(pl.LightningDataModule):
         self.num_workers = num_workers
         self.pos_weight: torch.Tensor | None = None
 
+    def _loader_kwargs(self, shuffle: bool) -> dict:
+        use_cuda = torch.cuda.is_available()
+        effective_workers = self.num_workers if use_cuda else 0
+        return {
+            "batch_size": self.batch_size,
+            "shuffle": shuffle,
+            "num_workers": effective_workers,
+            "pin_memory": use_cuda,
+            "persistent_workers": effective_workers > 0,
+        }
+
     def setup(self, stage: str | None = None):
         train_tf = get_train_transforms_albumentations(self.image_size)
         val_tf = get_val_transforms_albumentations(self.image_size)
@@ -42,31 +53,10 @@ class ChestXrayDataModule(pl.LightningDataModule):
         self.pos_weight = torch.tensor([n_normal / n_pneumonia], dtype=torch.float32)
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=self.num_workers > 0,
-        )
+        return DataLoader(self.train_dataset, **self._loader_kwargs(shuffle=True))
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=self.num_workers > 0,
-        )
+        return DataLoader(self.val_dataset, **self._loader_kwargs(shuffle=False))
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=self.num_workers > 0,
-        )
+        return DataLoader(self.test_dataset, **self._loader_kwargs(shuffle=False))
