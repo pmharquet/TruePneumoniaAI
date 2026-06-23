@@ -475,25 +475,55 @@ function setView(view) {
     btn.className = `tab-btn min-h-7 rounded px-3 ${active ? TAB_ACTIVE : TAB_INACTIVE}`;
   }
   if (view === "test") {
-    if (!state.testLoaded) initTestPage();
-    else loadModels(); // refresh the dropdown each visit — checkpoints change during training
+    if (!state.testLoaded) {
+      initTestPage();
+    } else {
+      // refresh on each visit — checkpoints change during training, and the
+      // dataset list may have grown (e.g. a freshly generated split).
+      populateTestDatasets();
+      loadModels();
+    }
   }
 }
 
 async function initTestPage() {
   state.testLoaded = true;
+  await populateTestDatasets();
+  await loadModels();
+  await loadPredSamples();
+}
+
+async function populateTestDatasets() {
   const datasetSelect = $("testDataset");
+  // Don't rely on boot-time state.project (it may not be loaded yet on the
+  // first tab open, or the dataset list may have grown) — fetch fresh.
+  let datasets = state.project?.datasets;
+  if (!datasets || datasets.length === 0) {
+    try {
+      const project = await getJson("/api/project");
+      state.project = project;
+      datasets = project.datasets;
+    } catch (error) {
+      datasets = [];
+    }
+  }
+  const previous = datasetSelect.value;
   datasetSelect.innerHTML = "";
-  for (const dataset of state.project?.datasets || []) {
+  let firstEnabled = null;
+  for (const dataset of datasets || []) {
     const option = document.createElement("option");
     option.value = dataset.name;
     option.textContent = `${dataset.name} (${dataset.total})`;
     option.disabled = !dataset.exists || dataset.total === 0;
-    if (dataset.name === state.project?.config?.data?.data_dir) option.selected = true;
+    if (!option.disabled && firstEnabled === null) firstEnabled = dataset.name;
     datasetSelect.appendChild(option);
   }
-  await loadModels();
-  await loadPredSamples();
+  // Default to the first available dataset (chest_Xray_patient, the leak-free
+  // split) rather than the training data_dir — keep the user's choice if still
+  // valid across refreshes.
+  const options = [...datasetSelect.options];
+  const keep = options.find((o) => o.value === previous && !o.disabled);
+  datasetSelect.value = keep ? previous : (firstEnabled || datasetSelect.value);
 }
 
 async function loadModels() {

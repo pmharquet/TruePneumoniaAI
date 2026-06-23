@@ -18,6 +18,7 @@ Thumbs.db
 # Dataset (trop volumineux pour git)
 chest_Xray/
 chest_Xray_augmented/
+chest_Xray_patient/
 
 # artifacts
 checkpoints/

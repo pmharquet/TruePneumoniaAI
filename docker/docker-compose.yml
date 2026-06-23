@@ -22,6 +22,7 @@ services:
       - ../src:/app/src
       - ../chest_Xray:/app/chest_Xray
       - ../chest_Xray_augmented:/app/chest_Xray_augmented
+      - ../chest_Xray_patient:/app/chest_Xray_patient
       - ../checkpoints:/app/checkpoints
       - ../exports:/app/exports
       - ../outputs:/app/outputs

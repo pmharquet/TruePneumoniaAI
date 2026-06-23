@@ -158,7 +158,7 @@ def train(cfg: dict):
     # cudnn.benchmark autotunes conv kernels for fixed input sizes — only safe
     # (and only worth it) when we are NOT requesting deterministic training.
     deterministic = bool(cfg["training"].get("deterministic", False))
-    pl.seed_everything(42, workers=deterministic)
+    pl.seed_everything(cfg["training"].get("seed", 42), workers=deterministic)
     if torch.cuda.is_available():
         torch.set_float32_matmul_precision("high")
         torch.backends.cudnn.benchmark = not deterministic

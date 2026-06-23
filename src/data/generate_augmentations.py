@@ -19,6 +19,7 @@ import csv
 import hashlib
 import json
 import random
+import re
 import shutil
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -34,12 +35,78 @@ CLASSES = ("NORMAL", "PNEUMONIA")
 SPLITS = ("train", "val", "test")
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
+# Patient id is encoded in the filename. PNEUMONIA: "personNNN_..."; NORMAL:
+# "IM-XXXX-..." or "NORMAL2-IM-XXXX-...". A patient has several images, so we
+# must group by these prefixes to avoid leaking a patient across splits.
+_PNEUMONIA_RE = re.compile(r"^(person\d+)", re.IGNORECASE)
+_NORMAL_RE = re.compile(r"^((?:normal2-)?im-\d+)", re.IGNORECASE)
+
 
 def list_images(class_dir: Path) -> list[Path]:
     return sorted(
         path for path in class_dir.iterdir()
         if path.is_file() and path.suffix.lower() in IMAGE_EXTS
     )
+
+
+def patient_key(path: Path, split: str, class_name: str) -> str:
+    """Namespaced patient id. The `personNNN`/`IM-XXXX` numbering restarts in
+    each original split, so `train:person100` and `test:person100` are DIFFERENT
+    patients — we prefix by the original split to never fuse two of them."""
+    pattern = _PNEUMONIA_RE if class_name == "PNEUMONIA" else _NORMAL_RE
+    match = pattern.match(path.name)
+    pid = match.group(1).lower() if match else path.stem.lower()
+    return f"{split}:{pid}"
+
+
+def build_patient_split(
+    input_root: Path, val_frac: float, test_frac: float, seed: int
+) -> tuple[dict[str, dict[str, list[Path]]], dict]:
+    """Merge all original splits, group images by patient, and re-partition the
+    PATIENTS (not images) into train/val/test, stratified by class. Returns
+    {new_split: {class: [source paths]}} plus a stats dict."""
+    rng = random.Random(seed)
+    # patient key -> (class_name, [paths])
+    patient_paths: dict[str, list[Path]] = defaultdict(list)
+    patient_class: dict[str, str] = {}
+    for split in SPLITS:
+        for class_name in CLASSES:
+            class_dir = input_root / split / class_name
+            if not class_dir.exists():
+                raise FileNotFoundError(f"Expected directory: {class_dir}")
+            for path in list_images(class_dir):
+                key = patient_key(path, split, class_name)
+                patient_paths[key].append(path)
+                patient_class[key] = class_name
+
+    by_class: dict[str, list[str]] = defaultdict(list)
+    for key, class_name in patient_class.items():
+        by_class[class_name].append(key)
+
+    splits_data: dict[str, dict[str, list[Path]]] = {
+        s: {c: [] for c in CLASSES} for s in SPLITS
+    }
+    stats: dict[str, dict] = {}
+    for class_name, keys in by_class.items():
+        keys = sorted(keys)
+        rng.shuffle(keys)
+        n = len(keys)
+        n_test = round(n * test_frac)
+        n_val = round(n * val_frac)
+        assigned = {
+            "test": keys[:n_test],
+            "val": keys[n_test:n_test + n_val],
+            "train": keys[n_test + n_val:],
+        }
+        stats[class_name] = {s: {"patients": len(ks)} for s, ks in assigned.items()}
+        for split_name, key_set in assigned.items():
+            for key in key_set:
+                splits_data[split_name][class_name].extend(patient_paths[key])
+            stats[class_name][split_name]["images"] = sum(
+                len(patient_paths[k]) for k in key_set
+            )
+
+    return splits_data, {"n_patients_total": len(patient_class), "by_class": stats}
 
 
 def read_rgb(path: Path) -> np.ndarray:
@@ -121,11 +188,31 @@ def generate_dataset(
     seed: int,
     jpeg_quality: int,
     overwrite: bool,
+    patient_split: bool = False,
+    val_frac: float = 0.15,
+    test_frac: float = 0.15,
 ) -> dict:
     random.seed(seed)
     np.random.seed(seed)
 
     ensure_output_dir(output_root, input_root, overwrite)
+
+    # Resolve where each source image goes. Patient-level re-split merges the
+    # original splits and re-partitions PATIENTS (leak-free); otherwise we keep
+    # the original train/val/test folders.
+    split_stats = None
+    if patient_split:
+        splits_data, split_stats = build_patient_split(
+            input_root, val_frac, test_frac, seed
+        )
+    else:
+        splits_data = {
+            split: {
+                class_name: list_images(input_root / split / class_name)
+                for class_name in CLASSES
+            }
+            for split in SPLITS
+        }
 
     resize_tf = get_offline_resize_transform(image_size)
     aug_tf = get_offline_train_transforms(image_size)
@@ -151,14 +238,10 @@ def generate_dataset(
 
         for split in SPLITS:
             for class_name in CLASSES:
-                src_dir = input_root / split / class_name
-                if not src_dir.exists():
-                    raise FileNotFoundError(f"Expected directory: {src_dir}")
-
                 out_dir = output_root / split / class_name
                 out_dir.mkdir(parents=True, exist_ok=True)
 
-                sources = list_images(src_dir)
+                sources = splits_data[split][class_name]
                 source_counts[split][class_name] = len(sources)
                 if split == "train":
                     train_sources[class_name] = sources
@@ -240,6 +323,10 @@ def generate_dataset(
         "mode": mode,
         "copies_per_image": copies_per_image if mode == "fixed" else None,
         "seed": seed,
+        "patient_split": patient_split,
+        "val_frac": val_frac if patient_split else None,
+        "test_frac": test_frac if patient_split else None,
+        "patient_split_stats": split_stats,
         "jpeg_quality": jpeg_quality,
         "source_counts": source_counts,
         "output_counts": {
@@ -265,6 +352,13 @@ def main() -> None:
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--jpeg-quality", default=95, type=int)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--patient-split",
+        action="store_true",
+        help="Merge all splits and re-partition at patient level (leak-free).",
+    )
+    parser.add_argument("--val-frac", default=0.15, type=float)
+    parser.add_argument("--test-frac", default=0.15, type=float)
     args = parser.parse_args()
 
     summary = generate_dataset(
@@ -276,6 +370,9 @@ def main() -> None:
         seed=args.seed,
         jpeg_quality=args.jpeg_quality,
         overwrite=args.overwrite,
+        patient_split=args.patient_split,
+        val_frac=args.val_frac,
+        test_frac=args.test_frac,
     )
 
     print(f"Generated dataset: {summary['output_root']}")
