@@ -4,6 +4,9 @@ data:
   num_workers: 8
   prefetch_factor: 4
   batch_size: 128
+  # Fraction of train *source* images held out for validation. The split is
+  # grouped by source so augmented variants never leak across train/val.
+  val_split: 0.15
 
 model:
   backbone: "densenet121" # densenet121 | resnet50

@@ -44,6 +44,41 @@ def configure_runtime_cache() -> None:
     xdg_cache.mkdir(parents=True, exist_ok=True)
 
 
+@torch.no_grad()
+def calibrate_threshold(model, dataloader, target_sensitivity: float) -> float:
+    """Pick a decision threshold on the validation set.
+
+    Returns the highest threshold whose sensitivity still meets the target
+    (which maximizes specificity at that constraint). If no threshold reaches
+    the target, falls back to the one with the highest sensitivity.
+    """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.eval().to(device)
+
+    probs_all, labels_all = [], []
+    for imgs, labels in dataloader:
+        imgs = imgs.to(device).contiguous(memory_format=torch.channels_last)
+        probs_all.append(torch.sigmoid(model(imgs)).cpu())
+        labels_all.append(labels.cpu())
+    probs = torch.cat(probs_all)
+    labels = torch.cat(labels_all).int()
+
+    pos, neg = labels == 1, labels == 0
+    n_pos, n_neg = int(pos.sum()), int(neg.sum())
+
+    best_t, best_spec, fallback_t, fallback_sens = 0.5, -1.0, 0.5, -1.0
+    for t in torch.linspace(0.01, 0.99, 99).tolist():
+        preds = probs >= t
+        sens = int((preds & pos).sum()) / n_pos if n_pos else 0.0
+        spec = int((~preds & neg).sum()) / n_neg if n_neg else 0.0
+        if sens > fallback_sens:
+            fallback_sens, fallback_t = sens, t
+        if sens >= target_sensitivity and spec >= best_spec:
+            best_spec, best_t = spec, t
+
+    return best_t if best_spec >= 0 else fallback_t
+
+
 def train(cfg: dict):
     configure_runtime_cache()
     # cudnn.benchmark autotunes conv kernels for fixed input sizes — only safe
@@ -60,6 +95,7 @@ def train(cfg: dict):
         batch_size=cfg["data"]["batch_size"],
         num_workers=cfg["data"]["num_workers"],
         prefetch_factor=cfg["data"].get("prefetch_factor", 4),
+        val_split=cfg["data"].get("val_split", 0.15),
     )
     dm.setup()
 
@@ -102,21 +138,25 @@ def train(cfg: dict):
             DashboardEventLogger(
                 log_every_n_steps=cfg.get("dashboard", {}).get("log_every_n_steps", 1),
             ),
+            # Select/stop on val/loss, not val/auroc: AUROC saturates near 1.0
+            # within the first epoch on this dataset, so it can't distinguish a
+            # well-calibrated model from an overfit one. val/loss penalizes the
+            # overconfident wrong predictions that wreck specificity.
             ModelCheckpoint(
                 dirpath=ckpt_dir,
-                filename="best-{epoch:02d}-{val/auroc:.4f}",
+                filename="best-{epoch:02d}-{val/loss:.4f}",
+                monitor="val/loss",
+                mode="min",
+                save_top_k=1,
+            ),
+            ModelCheckpoint(
+                dirpath=ckpt_dir,
+                filename="best-auroc-{epoch:02d}-{val/auroc:.4f}",
                 monitor="val/auroc",
                 mode="max",
                 save_top_k=1,
             ),
-            ModelCheckpoint(
-                dirpath=ckpt_dir,
-                filename="best-sensitivity-{epoch:02d}-{val/sensitivity:.4f}",
-                monitor="val/sensitivity",
-                mode="max",
-                save_top_k=1,
-            ),
-            EarlyStopping(monitor="val/auroc", patience=7, mode="max"),
+            EarlyStopping(monitor="val/loss", patience=5, mode="min"),
             LearningRateMonitor(logging_interval="epoch"),
         ]
 
@@ -134,7 +174,25 @@ def train(cfg: dict):
         )
 
         trainer.fit(model, datamodule=dm)
-        trainer.test(model, datamodule=dm, ckpt_path="best")
+
+        # Calibrate the decision threshold on validation to hit the target
+        # sensitivity, then evaluate test at that threshold. AUROC measures
+        # ranking; a screening tool still needs a sensible operating point.
+        best_ckpt = trainer.checkpoint_callbacks[0].best_model_path
+        if best_ckpt:
+            model = PneumoniaClassifier.load_from_checkpoint(
+                best_ckpt, pos_weight=dm.pos_weight
+            )
+        target_sens = cfg["threshold"].get("target_sensitivity", 0.95)
+        threshold = calibrate_threshold(model, dm.val_dataloader(), target_sens)
+        model.threshold = threshold
+        print(
+            f"Calibrated decision threshold = {threshold:.3f} "
+            f"(target sensitivity = {target_sens})"
+        )
+        mlflow.log_metric("calibrated_threshold", threshold)
+
+        trainer.test(model, datamodule=dm)
 
         mlflow.pytorch.log_model(model, "model")
 

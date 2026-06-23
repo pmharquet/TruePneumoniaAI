@@ -22,11 +22,21 @@ class ChestXrayDataset(Dataset):
         split: str,
         transform: Optional[Callable] = None,
         use_rgb: bool = True,
+        samples: Optional[list[tuple[Path, int]]] = None,
     ):
         self.root = Path(root) / split
         self.transform = transform
         self.use_rgb = use_rgb
         self.samples: list[tuple[Path, int]] = []
+
+        # Allow constructing from an explicit (path, label) list — used by the
+        # DataModule to build a leak-free validation split that groups augmented
+        # variants by their source image instead of globbing a directory.
+        if samples is not None:
+            self.samples = list(samples)
+            if not self.samples:
+                raise ValueError("Empty samples list passed to ChestXrayDataset")
+            return
 
         for class_name, label in CLASS_TO_IDX.items():
             class_dir = self.root / class_name
