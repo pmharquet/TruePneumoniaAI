@@ -12,7 +12,7 @@ from torchmetrics import AUROC, F1Score
 from torchmetrics.classification import BinaryRecall, BinarySpecificity, BinaryAccuracy
 import mlflow
 
-from .backbone import build_backbone
+from .backbone import build_backbone, freeze_backbone as apply_backbone_freeze
 
 
 class PneumoniaClassifier(pl.LightningModule):
@@ -25,12 +25,17 @@ class PneumoniaClassifier(pl.LightningModule):
         weight_decay: float = 1e-5,
         pos_weight: torch.Tensor | None = None,
         threshold: float = 0.5,
+        label_smoothing: float = 0.0,
+        freeze_backbone: bool = False,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["pos_weight"])
         self.threshold = threshold
+        self.label_smoothing = label_smoothing
 
         self.model = build_backbone(backbone, pretrained=pretrained, dropout=dropout)
+        if freeze_backbone:
+            apply_backbone_freeze(self.model, backbone)
         self.criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
         self.train_auroc = AUROC(task="binary")
@@ -60,7 +65,14 @@ class PneumoniaClassifier(pl.LightningModule):
         imgs, labels = batch
         imgs = imgs.contiguous(memory_format=torch.channels_last)
         logits = self(imgs)
-        loss = self.criterion(logits, labels)
+        # Label smoothing pulls targets off {0,1} so the model can't drive
+        # logits to ±inf — this keeps probabilities calibrated (less
+        # overconfidence), which matters under the train->test domain shift.
+        if self.label_smoothing > 0:
+            target = labels * (1 - self.label_smoothing) + 0.5 * self.label_smoothing
+        else:
+            target = labels
+        loss = self.criterion(logits, target)
         probs = torch.sigmoid(logits)
         return loss, probs, labels
 
@@ -139,8 +151,11 @@ class PneumoniaClassifier(pl.LightningModule):
         self._eval_epoch_end("test", self._test_logits, self._test_labels, self._test_metrics)
 
     def configure_optimizers(self):
+        # Only optimize trainable params — a frozen backbone must not receive
+        # weight-decay updates or AdamW moment buffers.
+        trainable = [p for p in self.parameters() if p.requires_grad]
         optimizer = torch.optim.AdamW(
-            self.parameters(),
+            trainable,
             lr=self.hparams.learning_rate,
             weight_decay=self.hparams.weight_decay,
         )

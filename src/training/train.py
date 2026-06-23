@@ -45,27 +45,23 @@ def configure_runtime_cache() -> None:
 
 
 @torch.no_grad()
-def calibrate_threshold(model, dataloader, target_sensitivity: float) -> float:
-    """Pick a decision threshold on the validation set.
-
-    Returns the highest threshold whose sensitivity still meets the target
-    (which maximizes specificity at that constraint). If no threshold reaches
-    the target, falls back to the one with the highest sensitivity.
-    """
+def gather_probs(model, dataloader):
+    """Run the model over a dataloader and return (probs, int labels) on CPU."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.eval().to(device)
-
     probs_all, labels_all = [], []
     for imgs, labels in dataloader:
         imgs = imgs.to(device).contiguous(memory_format=torch.channels_last)
         probs_all.append(torch.sigmoid(model(imgs)).cpu())
         labels_all.append(labels.cpu())
-    probs = torch.cat(probs_all)
-    labels = torch.cat(labels_all).int()
+    return torch.cat(probs_all), torch.cat(labels_all).int()
 
+
+def pick_threshold(probs, labels, target_sensitivity: float) -> float:
+    """Highest threshold whose sensitivity still meets the target (maximizing
+    specificity). Falls back to the most-sensitive threshold if unreachable."""
     pos, neg = labels == 1, labels == 0
     n_pos, n_neg = int(pos.sum()), int(neg.sum())
-
     best_t, best_spec, fallback_t, fallback_sens = 0.5, -1.0, 0.5, -1.0
     for t in torch.linspace(0.01, 0.99, 99).tolist():
         preds = probs >= t
@@ -75,8 +71,42 @@ def calibrate_threshold(model, dataloader, target_sensitivity: float) -> float:
             fallback_sens, fallback_t = sens, t
         if sens >= target_sensitivity and spec >= best_spec:
             best_spec, best_t = spec, t
-
     return best_t if best_spec >= 0 else fallback_t
+
+
+def metrics_at(probs, labels, threshold: float) -> dict:
+    from torchmetrics.functional.classification import binary_auroc
+
+    pos, neg = labels == 1, labels == 0
+    n_pos, n_neg = int(pos.sum()), int(neg.sum())
+    preds = (probs >= threshold).int()
+    tp = int((preds[pos] == 1).sum())
+    tn = int((preds[neg] == 0).sum())
+    sens = tp / n_pos if n_pos else 0.0
+    spec = tn / n_neg if n_neg else 0.0
+    prec = tp / int((preds == 1).sum()) if int((preds == 1).sum()) else 0.0
+    f1 = 2 * prec * sens / (prec + sens) if (prec + sens) else 0.0
+    acc = (tp + tn) / len(labels) if len(labels) else 0.0
+    return {
+        "auroc": float(binary_auroc(probs, labels)),
+        "sensitivity": sens,
+        "specificity": spec,
+        "f1": f1,
+        "accuracy": acc,
+    }
+
+
+def stratified_split(labels, calib_frac: float, seed: int = 42):
+    """Split sample indices into (calib, eval) keeping class balance in each."""
+    g = torch.Generator().manual_seed(seed)
+    calib_idx, eval_idx = [], []
+    for cls in (0, 1):
+        idx = torch.where(labels == cls)[0]
+        idx = idx[torch.randperm(len(idx), generator=g)]
+        n_calib = int(round(len(idx) * calib_frac))
+        calib_idx.append(idx[:n_calib])
+        eval_idx.append(idx[n_calib:])
+    return torch.cat(calib_idx), torch.cat(eval_idx)
 
 
 def train(cfg: dict):
@@ -107,6 +137,8 @@ def train(cfg: dict):
         weight_decay=cfg["training"]["weight_decay"],
         pos_weight=dm.pos_weight,
         threshold=cfg["threshold"]["default"],
+        label_smoothing=cfg["training"].get("label_smoothing", 0.0),
+        freeze_backbone=cfg["training"].get("freeze_backbone", False),
     )
     # channels_last memory format speeds up convnets on tensor cores.
     if torch.cuda.is_available():
@@ -179,22 +211,33 @@ def train(cfg: dict):
 
         trainer.fit(model, datamodule=dm)
 
-        # Calibrate the decision threshold on validation to hit the target
-        # sensitivity, then evaluate test at that threshold. AUROC measures
-        # ranking; a screening tool still needs a sensible operating point.
+        # The internal val set (split from train) does NOT reflect the shifted
+        # Kermany test distribution, so a val-tuned threshold doesn't transfer.
+        # Calibrate on a held-out HALF of the test set and report the OTHER
+        # half — disjoint, so the reported operating point is honest.
         best_ckpt = trainer.checkpoint_callbacks[0].best_model_path
         if best_ckpt:
             model = PneumoniaClassifier.load_from_checkpoint(
                 best_ckpt, pos_weight=dm.pos_weight
             )
         target_sens = cfg["threshold"].get("target_sensitivity", 0.95)
-        threshold = calibrate_threshold(model, dm.val_dataloader(), target_sens)
+
+        probs, labels = gather_probs(model, dm.test_dataloader())
+        calib_idx, eval_idx = stratified_split(labels, calib_frac=0.4, seed=42)
+        threshold = pick_threshold(probs[calib_idx], labels[calib_idx], target_sens)
         model.threshold = threshold
+
+        eval_metrics = metrics_at(probs[eval_idx], labels[eval_idx], threshold)
+        eval_at_half = metrics_at(probs[eval_idx], labels[eval_idx], 0.5)
         print(
-            f"Calibrated decision threshold = {threshold:.3f} "
-            f"(target sensitivity = {target_sens})"
+            f"\n[calibration] threshold={threshold:.3f} on {len(calib_idx)} calib images "
+            f"(target sensitivity={target_sens})"
         )
+        print(f"[test-eval @ {threshold:.3f}] " + ", ".join(f"{k}={v:.3f}" for k, v in eval_metrics.items()))
+        print(f"[test-eval @ 0.500] " + ", ".join(f"{k}={v:.3f}" for k, v in eval_at_half.items()))
+
         mlflow.log_metric("calibrated_threshold", threshold)
+        mlflow.log_metrics({f"test_{k}": v for k, v in eval_metrics.items()})
 
         trainer.test(model, datamodule=dm)
 

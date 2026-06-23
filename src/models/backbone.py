@@ -30,3 +30,30 @@ def build_backbone(name: str, pretrained: bool = True, dropout: float = 0.5) -> 
         raise ValueError(f"Unknown backbone: {name}. Choose 'densenet121' or 'resnet50'.")
 
     return model
+
+
+def freeze_backbone(model: nn.Module, name: str, train_last_block: bool = True) -> None:
+    """Freeze the pretrained feature extractor in place, keeping the classifier
+    head (and optionally the last block) trainable.
+
+    Fine-tuning all 7M params on this small, augmentation-duplicated dataset
+    memorizes the train sources and fails to generalize to the shifted test
+    distribution. Keeping the early ImageNet features fixed reduces overfitting.
+    """
+    if name == "densenet121":
+        for param in model.features.parameters():
+            param.requires_grad = False
+        if train_last_block:
+            for block in ("denseblock4", "norm5"):
+                for param in getattr(model.features, block).parameters():
+                    param.requires_grad = True
+    elif name == "resnet50":
+        for param_name, param in model.named_parameters():
+            if not param_name.startswith("fc."):
+                param.requires_grad = False
+        if train_last_block:
+            for param in model.layer4.parameters():
+                param.requires_grad = True
+    else:
+        raise ValueError(f"Unknown backbone: {name}.")
+    # The classifier head is a separate module and stays trainable.

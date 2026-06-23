@@ -18,6 +18,9 @@ training:
   max_epochs: 30
   learning_rate: 1.0e-4
   weight_decay: 1.0e-5
+  # Regularization against train->test domain shift (see eval-methodology).
+  label_smoothing: 0.05  # keeps probabilities calibrated (less overconfidence)
+  freeze_backbone: true  # train only the last dense block + head
   # pos_weight: weight for PNEUMONIA class (handles imbalance)
   # computed dynamically from dataset in datamodule
   precision: "16-mixed" # AMP for faster training on GPU
