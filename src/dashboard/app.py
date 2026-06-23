@@ -72,6 +72,14 @@ app = FastAPI(title="TruePneumoniaAI Dashboard", version="0.1.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def no_cache(request: Request, call_next):
+    """Disable browser caching so static assets always reflect the latest build."""
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
 def _now_id() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 

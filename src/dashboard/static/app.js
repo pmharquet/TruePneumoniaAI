@@ -78,11 +78,11 @@ function renderDatasets() {
   for (const dataset of state.project.datasets) {
     const train = dataset.counts.train || {};
     const row = document.createElement("div");
-    row.className = "dataset-row";
+    row.className = ROW;
     row.innerHTML = `
-      <div>
+      <div class="min-w-0">
         <strong>${dataset.name}</strong>
-        <div class="muted">train N=${train.NORMAL || 0} P=${train.PNEUMONIA || 0}</div>
+        <div class="truncate text-[11px] text-slate-500">train N=${train.NORMAL || 0} P=${train.PNEUMONIA || 0}</div>
       </div>
       <strong>${dataset.total}</strong>
     `;
@@ -101,7 +101,7 @@ function renderSystem(system) {
     ["Disque libre", `${system.disk.free_gb} / ${system.disk.total_gb} GB`],
     ["Python", system.python],
   ];
-  target.innerHTML = rows.map(([k, v]) => `<div class="kv-row"><span>${k}</span><strong>${v}</strong></div>`).join("");
+  target.innerHTML = rows.map(([k, v]) => `<div class="${ROW}"><span class="text-slate-500">${k}</span><strong class="break-words text-right">${v}</strong></div>`).join("");
 }
 
 function renderArtifacts(artifacts) {
@@ -109,24 +109,24 @@ function renderArtifacts(artifacts) {
   const checkpoints = artifacts.checkpoints || [];
   const rows = [];
   rows.push(`
-    <div class="artifact-row">
+    <div class="${ROW}">
       <span>ONNX</span>
       <strong>${artifacts.onnx.exists ? `${artifacts.onnx.size_mb} MB` : "absent"}</strong>
     </div>
   `);
   rows.push(`
-    <div class="artifact-row">
+    <div class="${ROW}">
       <span>MLflow</span>
       <strong>${artifacts.mlflow.exists ? "présent" : "absent"}</strong>
     </div>
   `);
   if (checkpoints.length === 0) {
-    rows.push(`<div class="artifact-row"><span>Checkpoints</span><strong>aucun</strong></div>`);
+    rows.push(`<div class="${ROW}"><span>Checkpoints</span><strong>aucun</strong></div>`);
   } else {
     for (const ckpt of checkpoints.slice(0, 8)) {
       rows.push(`
-        <div class="artifact-row">
-          <span title="${ckpt.path}">${ckpt.name}</span>
+        <div class="${ROW}">
+          <span class="truncate" title="${ckpt.path}">${ckpt.name}</span>
           <strong>${ckpt.size_mb} MB</strong>
         </div>
       `);
@@ -135,7 +135,7 @@ function renderArtifacts(artifacts) {
   const weights = artifacts.pretrained_weights || {};
   for (const [name, info] of Object.entries(weights)) {
     rows.push(`
-      <div class="artifact-row">
+      <div class="${ROW}">
         <span>Poids ${name}</span>
         <strong>${info.exists ? "présents" : "absents"}</strong>
       </div>
@@ -154,16 +154,31 @@ async function loadSamples() {
     img.src = image.src;
     img.alt = image.name;
     img.title = image.name;
+    img.className = "aspect-square w-full rounded-md border border-slate-200 bg-black object-cover";
     target.appendChild(img);
   }
 }
+
+const PILL_BASE = "inline-flex min-h-7 items-center rounded-full border px-2.5 text-[11px] font-extrabold uppercase ";
+const PILL_VARIANTS = {
+  running: "border-blue-200 bg-blue-50 text-blue-700",
+  completed: "border-green-200 bg-green-50 text-green-700",
+  failed: "border-red-200 bg-red-50 text-red-700",
+  starting: "border-amber-200 bg-amber-50 text-amber-700",
+};
+
+function statusPillClass(status) {
+  return PILL_BASE + (PILL_VARIANTS[status] || "border-slate-200 bg-slate-50 text-slate-500");
+}
+
+const ROW = "grid grid-cols-[1fr_auto] items-center gap-2 border-b border-slate-100 py-1.5 text-xs last:border-0";
 
 function updateStatus(payload) {
   state.status = payload;
   const runState = payload.state || {};
   const status = payload.running ? "running" : (runState.status || "idle");
   const statusEl = $("runStatus");
-  statusEl.className = `status-pill ${status}`;
+  statusEl.className = statusPillClass(status);
   statusEl.textContent = status;
 
   $("startBtn").disabled = payload.running;
@@ -171,6 +186,7 @@ function updateStatus(payload) {
   $("runDir").textContent = payload.run_dir || "";
 
   renderProgress(runState);
+  renderPerformance(runState.performance || {});
   renderMetrics(runState.latest_metrics || {});
   renderCharts(payload.events || []);
   renderArtifacts(payload.artifacts || {});
@@ -191,6 +207,34 @@ function renderProgress(runState) {
   $("batchLabel").textContent = `${trainBatch} / ${trainBatches || 0}`;
   $("epochBar").style.width = `${epochPct}%`;
   $("batchBar").style.width = `${batchPct}%`;
+}
+
+function fmtMem(mb) {
+  if (mb === null || mb === undefined) return "-";
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
+}
+
+function fmtDuration(seconds) {
+  if (seconds === null || seconds === undefined) return "-";
+  const s = Math.max(0, Math.round(Number(seconds)));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m) return `${m}m ${String(sec).padStart(2, "0")}s`;
+  return `${sec}s`;
+}
+
+function renderPerformance(perf) {
+  const round0 = (v) => (v === null || v === undefined ? "-" : String(Math.round(Number(v))));
+  $("perfImgS").textContent = round0(perf.img_per_s);
+  $("perfImgSAvg").textContent = round0(perf.img_per_s_avg);
+  $("perfMsBatch").textContent = round0(perf.ms_per_batch);
+  $("perfStepsS").textContent = perf.steps_per_s != null ? fmt(perf.steps_per_s, 2) : "-";
+  $("perfVram").textContent = fmtMem(perf.gpu_mem_mb);
+  $("perfVramPeak").textContent = fmtMem(perf.gpu_mem_peak_mb);
+  $("perfElapsed").textContent = fmtDuration(perf.elapsed_seconds);
+  $("perfEta").textContent = fmtDuration(perf.eta_seconds);
 }
 
 function renderMetrics(metrics) {
@@ -218,8 +262,14 @@ function seriesFromEvents(events, keyNames) {
 
 function drawChart(canvas, series, options = {}) {
   const ctx = canvas.getContext("2d");
-  const width = canvas.width;
-  const height = canvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth || canvas.width;
+  const height = canvas.clientHeight || canvas.height;
+  const bufW = Math.round(width * dpr);
+  const bufH = Math.round(height * dpr);
+  if (canvas.width !== bufW) canvas.width = bufW;
+  if (canvas.height !== bufH) canvas.height = bufH;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
@@ -289,7 +339,28 @@ function drawChart(canvas, series, options = {}) {
   }
 }
 
+function observeCharts() {
+  if (typeof ResizeObserver === "undefined") {
+    window.addEventListener("resize", () => renderCharts(state.lastEvents || []));
+    return;
+  }
+  let scheduled = false;
+  const observer = new ResizeObserver(() => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      renderCharts(state.lastEvents || []);
+    });
+  });
+  for (const id of ["lossChart", "metricChart"]) {
+    const canvas = $(id);
+    if (canvas) observer.observe(canvas);
+  }
+}
+
 function renderCharts(events) {
+  state.lastEvents = events;
   const lossSeries = [
     { label: "train/loss", color: "#2563eb", points: seriesFromEvents(events, ["train/loss", "train/loss_epoch"]) },
     { label: "val/loss", color: "#a15c07", points: seriesFromEvents(events, ["val/loss"]) },
@@ -364,6 +435,8 @@ async function boot() {
     await refreshStatus();
   });
   $("dataDir").addEventListener("change", loadSamples);
+
+  observeCharts();
 
   await loadProject();
   await refreshStatus();

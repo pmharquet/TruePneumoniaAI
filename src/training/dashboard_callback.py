@@ -51,6 +51,29 @@ def _trainer_val_batches(trainer) -> int:
     return _safe_int(batches)
 
 
+def _batch_num_samples(batch: Any) -> int:
+    """Best-effort count of images in a training batch."""
+    sample = batch
+    if isinstance(batch, (list, tuple)) and batch:
+        sample = batch[0]
+    if isinstance(sample, torch.Tensor):
+        return int(sample.shape[0]) if sample.ndim else 0
+    if isinstance(sample, Mapping):
+        for value in sample.values():
+            if isinstance(value, torch.Tensor) and value.ndim:
+                return int(value.shape[0])
+    return 0
+
+
+def _gpu_memory_mb() -> tuple[float | None, float | None]:
+    """Return (allocated, peak) GPU memory in MB, or (None, None) on CPU."""
+    if not torch.cuda.is_available():
+        return None, None
+    allocated = torch.cuda.memory_allocated() / 1024 ** 2
+    peak = torch.cuda.max_memory_allocated() / 1024 ** 2
+    return round(allocated, 1), round(peak, 1)
+
+
 class DashboardEventLogger(Callback):
     def __init__(
         self,
@@ -70,8 +93,17 @@ class DashboardEventLogger(Callback):
             "started_at": self.started_at,
             "last_event_at": self.started_at,
             "latest_metrics": {},
+            "performance": {},
         }
         self._initialized = False
+        # Throughput / timing trackers
+        self._batch_start: float | None = None
+        self._batch_samples: int = 0
+        self._img_ema: float | None = None
+        self._ms_ema: float | None = None
+        self._epoch_samples: int = 0
+        self._epoch_time: float = 0.0
+        self._total_samples: int = 0
 
     def setup(self, trainer, pl_module, stage: str) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -156,6 +188,8 @@ class DashboardEventLogger(Callback):
         self._write_event("fit_start", self._state)
 
     def on_train_epoch_start(self, trainer, pl_module) -> None:
+        self._epoch_samples = 0
+        self._epoch_time = 0.0
         self._write_event("train_epoch_start", {
             "status": "running",
             "stage": "train",
@@ -166,7 +200,58 @@ class DashboardEventLogger(Callback):
             "global_step": _safe_int(trainer.global_step),
         })
 
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx: int) -> None:
+        self._batch_start = time.perf_counter()
+        self._batch_samples = _batch_num_samples(batch)
+
+    def _update_performance(self, trainer, batch_idx: int) -> dict[str, Any]:
+        """Compute throughput/timing stats from the batch that just finished."""
+        now = time.perf_counter()
+        dt = now - self._batch_start if self._batch_start is not None else 0.0
+        samples = self._batch_samples
+        perf = dict(self._state.get("performance") or {})
+
+        if dt > 0 and samples > 0:
+            img_s = samples / dt
+            ms = dt * 1000.0
+            alpha = 0.3
+            self._img_ema = img_s if self._img_ema is None else (1 - alpha) * self._img_ema + alpha * img_s
+            self._ms_ema = ms if self._ms_ema is None else (1 - alpha) * self._ms_ema + alpha * ms
+            self._epoch_samples += samples
+            self._epoch_time += dt
+            self._total_samples += samples
+
+        avg_img_s = self._epoch_samples / self._epoch_time if self._epoch_time > 0 else None
+        elapsed = time.time() - self.started_at
+
+        # ETA from remaining batches at the current smoothed batch time.
+        train_batches = _trainer_train_batches(trainer)
+        max_epochs = _safe_int(trainer.max_epochs)
+        epoch = _safe_int(trainer.current_epoch)
+        eta = None
+        if train_batches > 0 and max_epochs > 0 and self._ms_ema:
+            done = epoch * train_batches + (batch_idx + 1)
+            remaining = max(0, max_epochs * train_batches - done)
+            eta = remaining * (self._ms_ema / 1000.0)
+
+        gpu_alloc, gpu_peak = _gpu_memory_mb()
+        perf.update({
+            "img_per_s": round(self._img_ema, 1) if self._img_ema is not None else None,
+            "img_per_s_avg": round(avg_img_s, 1) if avg_img_s is not None else None,
+            "ms_per_batch": round(self._ms_ema, 1) if self._ms_ema is not None else None,
+            "steps_per_s": round(1000.0 / self._ms_ema, 2) if self._ms_ema else None,
+            "gpu_mem_mb": gpu_alloc,
+            "gpu_mem_peak_mb": gpu_peak,
+            "elapsed_seconds": round(elapsed, 1),
+            "eta_seconds": round(eta, 1) if eta is not None else None,
+            "total_images": self._total_samples,
+        })
+        self._state["performance"] = perf
+        return perf
+
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx: int) -> None:
+        perf = self._update_performance(trainer, batch_idx)
+
         if batch_idx % self.log_every_n_steps != 0:
             return
 
@@ -175,6 +260,8 @@ class DashboardEventLogger(Callback):
         if trainer.optimizers:
             lr = trainer.optimizers[0].param_groups[0].get("lr")
             metrics["lr"] = float(lr) if lr is not None else None
+        if perf.get("img_per_s") is not None:
+            metrics["perf/img_per_s"] = perf["img_per_s"]
 
         self._write_event("train_batch_end", {
             "status": "running",
@@ -185,6 +272,7 @@ class DashboardEventLogger(Callback):
             "train_batches": _trainer_train_batches(trainer),
             "global_step": _safe_int(trainer.global_step),
             "metrics": metrics,
+            "performance": perf,
         })
 
     def on_train_epoch_end(self, trainer, pl_module) -> None:
