@@ -18,6 +18,8 @@ services:
     # with "bus error". 64MB (default) is far too small.
     shm_size: "8gb"
     volumes:
+      # Live-mount source so code edits show up on container restart (no rebuild).
+      - ../src:/app/src
       - ../chest_Xray:/app/chest_Xray
       - ../chest_Xray_augmented:/app/chest_Xray_augmented
       - ../checkpoints:/app/checkpoints

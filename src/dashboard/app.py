@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
 import platform
@@ -210,12 +211,14 @@ def _artifact_snapshot(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     mlruns = _safe_relative_path(Path(cfg["mlflow"]["tracking_uri"]))
     torch_cache = ROOT / "outputs" / "cache" / "torch" / "hub" / "checkpoints"
 
+    # rglob, not glob: checkpoint filenames embed "val/loss" etc., so Lightning
+    # nests the .ckpt inside a "val" subdirectory.
     checkpoints = []
     if ckpt_dir.exists():
-        for path in sorted(ckpt_dir.glob("*.ckpt"), key=lambda p: p.stat().st_mtime, reverse=True):
+        for path in sorted(ckpt_dir.rglob("*.ckpt"), key=lambda p: p.stat().st_mtime, reverse=True):
             checkpoints.append({
-                "name": path.name,
-                "path": str(path.relative_to(ROOT)),
+                "name": str(path.relative_to(ckpt_dir)).replace("\\", "/"),
+                "path": str(path.relative_to(ROOT)).replace("\\", "/"),
                 "size_mb": round(path.stat().st_size / 1024 / 1024, 2),
                 "modified": path.stat().st_mtime,
             })
@@ -474,6 +477,96 @@ def dataset_sample(
             "src": f"data:image/jpeg;base64,{encoded}",
         })
     return {"images": payload}
+
+
+def _resolve_checkpoint(checkpoint: str) -> Path:
+    if not checkpoint:
+        raise HTTPException(status_code=400, detail="No checkpoint provided.")
+    ckpt_dir = _safe_relative_path(Path(_load_yaml(DEFAULT_CONFIG)["paths"]["checkpoints"]))
+    path = _safe_relative_path(Path(checkpoint))
+    if ckpt_dir.resolve() not in (path, *path.parents):
+        raise HTTPException(status_code=400, detail="Checkpoint outside checkpoints directory.")
+    if not path.exists() or path.suffix != ".ckpt":
+        raise HTTPException(status_code=404, detail=f"Checkpoint not found: {checkpoint}")
+    return path
+
+
+def _parse_threshold(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        thr = float(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid threshold.")
+    if not 0.0 <= thr <= 1.0:
+        raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1.")
+    return thr
+
+
+@app.get("/api/models")
+def list_models() -> dict[str, Any]:
+    return {"checkpoints": _artifact_snapshot()["checkpoints"]}
+
+
+@app.post("/api/evaluate")
+async def evaluate_model(request: Request) -> dict[str, Any]:
+    from src.dashboard import inference
+
+    body = await request.json()
+    ckpt = _resolve_checkpoint(body.get("checkpoint", ""))
+    dataset = body.get("dataset") or _default_data_dir()
+    _safe_relative_path(Path(dataset))  # validate
+    split = body.get("split") or "test"
+    if split not in SPLITS:
+        raise HTTPException(status_code=400, detail=f"Invalid split: {split}")
+    threshold = _parse_threshold(body.get("threshold"))
+    try:
+        return inference.evaluate_split(ckpt, dataset, split=split, threshold=threshold)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@app.post("/api/predict")
+async def predict_dataset_image(request: Request) -> dict[str, Any]:
+    from src.dashboard import inference
+
+    body = await request.json()
+    ckpt = _resolve_checkpoint(body.get("checkpoint", ""))
+    dataset = body.get("dataset") or _default_data_dir()
+    split = body.get("split") or "test"
+    class_name = body.get("class_name") or "NORMAL"
+    name = body.get("name") or ""
+    threshold = _parse_threshold(body.get("threshold"))
+    if class_name not in CLASSES or split not in SPLITS:
+        raise HTTPException(status_code=400, detail="Invalid split or class.")
+
+    image_path = _safe_relative_path(Path(dataset) / split / class_name / name)
+    if not image_path.exists() or image_path.suffix.lower() not in IMAGE_EXTS:
+        raise HTTPException(status_code=404, detail=f"Image not found: {name}")
+
+    result = inference.predict_image(ckpt, Image.open(image_path), threshold=threshold)
+    result["true_label"] = class_name
+    result["correct"] = result["prediction"] == class_name
+    return result
+
+
+@app.post("/api/predict-upload")
+async def predict_uploaded_image(request: Request) -> dict[str, Any]:
+    from src.dashboard import inference
+
+    body = await request.json()
+    ckpt = _resolve_checkpoint(body.get("checkpoint", ""))
+    thr = _parse_threshold(body.get("threshold"))
+
+    data_url = body.get("image") or ""
+    if "," in data_url:  # strip "data:image/...;base64," prefix
+        data_url = data_url.split(",", 1)[1]
+    try:
+        raw = base64.b64decode(data_url)
+        image = Image.open(io.BytesIO(raw))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Could not read uploaded image.")
+    return inference.predict_image(ckpt, image, threshold=thr)
 
 
 @app.websocket("/ws/status")

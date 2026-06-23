@@ -142,19 +142,23 @@ def train(cfg: dict):
             # within the first epoch on this dataset, so it can't distinguish a
             # well-calibrated model from an overfit one. val/loss penalizes the
             # overconfident wrong predictions that wreck specificity.
+            # auto_insert_metric_name=False so the "/" in "val/loss" is not baked
+            # into the filename (which would nest the .ckpt in a subdirectory).
             ModelCheckpoint(
                 dirpath=ckpt_dir,
-                filename="best-{epoch:02d}-{val/loss:.4f}",
+                filename="best-loss-epoch{epoch:02d}",
                 monitor="val/loss",
                 mode="min",
                 save_top_k=1,
+                auto_insert_metric_name=False,
             ),
             ModelCheckpoint(
                 dirpath=ckpt_dir,
-                filename="best-auroc-{epoch:02d}-{val/auroc:.4f}",
+                filename="best-auroc-epoch{epoch:02d}",
                 monitor="val/auroc",
                 mode="max",
                 save_top_k=1,
+                auto_insert_metric_name=False,
             ),
             EarlyStopping(monitor="val/loss", patience=5, mode="min"),
             LearningRateMonitor(logging_interval="epoch"),

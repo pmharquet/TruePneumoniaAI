@@ -427,6 +427,224 @@ function connectSocket() {
   };
 }
 
+// ===================== Test des modèles =====================
+
+const TAB_ACTIVE = "bg-white text-slate-900 shadow-sm";
+const TAB_INACTIVE = "text-slate-600";
+
+function setView(view) {
+  $("view-train").classList.toggle("hidden", view !== "train");
+  $("view-train").classList.toggle("grid", view === "train");
+  $("view-test").classList.toggle("hidden", view !== "test");
+  $("view-test").classList.toggle("grid", view === "test");
+  for (const btn of document.querySelectorAll(".tab-btn")) {
+    const active = btn.dataset.view === view;
+    btn.className = `tab-btn min-h-7 rounded px-3 ${active ? TAB_ACTIVE : TAB_INACTIVE}`;
+  }
+  if (view === "test" && !state.testLoaded) initTestPage();
+}
+
+async function initTestPage() {
+  state.testLoaded = true;
+  const datasetSelect = $("testDataset");
+  datasetSelect.innerHTML = "";
+  for (const dataset of state.project?.datasets || []) {
+    const option = document.createElement("option");
+    option.value = dataset.name;
+    option.textContent = `${dataset.name} (${dataset.total})`;
+    option.disabled = !dataset.exists || dataset.total === 0;
+    if (dataset.name === state.project?.config?.data?.data_dir) option.selected = true;
+    datasetSelect.appendChild(option);
+  }
+  await loadModels();
+  await loadPredSamples();
+}
+
+async function loadModels() {
+  const select = $("modelSelect");
+  try {
+    const data = await getJson("/api/models");
+    select.innerHTML = "";
+    const checkpoints = data.checkpoints || [];
+    if (checkpoints.length === 0) {
+      select.innerHTML = `<option value="">aucun checkpoint</option>`;
+      return;
+    }
+    for (const ckpt of checkpoints) {
+      const option = document.createElement("option");
+      option.value = ckpt.path;
+      option.textContent = `${ckpt.name} (${ckpt.size_mb} MB)`;
+      select.appendChild(option);
+    }
+  } catch (error) {
+    select.innerHTML = `<option value="">erreur: ${error.message}</option>`;
+  }
+}
+
+function currentThreshold() {
+  return Number($("thresholdSlider").value);
+}
+
+async function runEvaluate() {
+  const checkpoint = $("modelSelect").value;
+  if (!checkpoint) {
+    alert("Sélectionne un checkpoint.");
+    return;
+  }
+  const btn = $("evalBtn");
+  btn.disabled = true;
+  $("evalMeta").textContent = "évaluation en cours…";
+  try {
+    const result = await postJson("/api/evaluate", {
+      checkpoint,
+      dataset: $("testDataset").value,
+      split: $("evalSplit").value,
+      threshold: currentThreshold(),
+    });
+    const m = result.metrics;
+    $("evalAuroc").textContent = fmt(m.auroc, 3);
+    $("evalSens").textContent = fmt(m.sensitivity, 3);
+    $("evalSpec").textContent = fmt(m.specificity, 3);
+    $("evalF1").textContent = fmt(m.f1, 3);
+    $("evalAcc").textContent = fmt(m.accuracy, 3);
+    $("evalMeta").textContent = `${result.count} images · N=${result.n_normal} P=${result.n_pneumonia} · seuil ${result.threshold.toFixed(2)}`;
+    const c = result.confusion;
+    const cells = [
+      ["Vrais positifs", c.tp, "text-green-700"],
+      ["Vrais négatifs", c.tn, "text-green-700"],
+      ["Faux positifs", c.fp, "text-red-700"],
+      ["Faux négatifs", c.fn, "text-red-700"],
+    ];
+    $("evalConfusion").innerHTML = cells
+      .map(([label, value, color]) => `<div class="rounded-md border border-slate-200 px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">${label}</span><strong class="mt-1 block text-base tabular-nums ${color}">${value}</strong></div>`)
+      .join("");
+  } catch (error) {
+    $("evalMeta").textContent = "";
+    alert(`Évaluation impossible: ${error.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function loadPredSamples() {
+  const dataset = $("testDataset").value || "chest_Xray_augmented";
+  const split = $("predSplit").value;
+  const className = $("predClass").value;
+  const grid = $("predGrid");
+  grid.innerHTML = `<span class="col-span-full text-[11px] text-slate-400">chargement…</span>`;
+  try {
+    const data = await getJson(`/api/dataset/sample?dataset=${encodeURIComponent(dataset)}&split=${split}&class_name=${className}&limit=8`);
+    grid.innerHTML = "";
+    for (const image of data.images) {
+      const img = document.createElement("img");
+      img.src = image.src;
+      img.alt = image.name;
+      img.title = `${image.name} — cliquer pour prédire`;
+      img.className = "aspect-square w-full cursor-pointer rounded-md border border-slate-200 bg-black object-cover hover:ring-2 hover:ring-blue-400";
+      img.addEventListener("click", () => predictSample(image.name, image.src, className));
+      grid.appendChild(img);
+    }
+    if (data.images.length === 0) grid.innerHTML = `<span class="col-span-full text-[11px] text-slate-400">aucune image</span>`;
+  } catch (error) {
+    grid.innerHTML = `<span class="col-span-full text-[11px] text-red-600">${error.message}</span>`;
+  }
+}
+
+async function predictSample(name, src, trueLabel) {
+  const checkpoint = $("modelSelect").value;
+  if (!checkpoint) {
+    alert("Sélectionne un checkpoint.");
+    return;
+  }
+  try {
+    const result = await postJson("/api/predict", {
+      checkpoint,
+      dataset: $("testDataset").value,
+      split: $("predSplit").value,
+      class_name: trueLabel,
+      name,
+      threshold: currentThreshold(),
+    });
+    renderPrediction(result, src, trueLabel);
+  } catch (error) {
+    alert(`Prédiction impossible: ${error.message}`);
+  }
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function predictUpload(file) {
+  const checkpoint = $("modelSelect").value;
+  if (!checkpoint) {
+    alert("Sélectionne un checkpoint.");
+    return;
+  }
+  try {
+    const dataUrl = await readFileAsDataURL(file);
+    const result = await postJson("/api/predict-upload", {
+      checkpoint,
+      threshold: currentThreshold(),
+      image: dataUrl,
+    });
+    renderPrediction(result, dataUrl, null);
+  } catch (error) {
+    alert(`Prédiction impossible: ${error.message}`);
+  }
+}
+
+function renderPrediction(result, src, trueLabel) {
+  const box = $("predResult");
+  box.classList.remove("hidden");
+  box.classList.add("grid");
+  $("predImage").src = src;
+
+  const prob = Number(result.probability);
+  const isPneumonia = result.prediction === "PNEUMONIA";
+  const badge = $("predBadge");
+  badge.textContent = result.prediction;
+  badge.className = `inline-flex min-h-7 items-center rounded-full border px-3 text-[11px] font-extrabold uppercase ${isPneumonia ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700"}`;
+
+  const truth = $("predTruth");
+  if (trueLabel) {
+    const correct = result.correct ?? (result.prediction === trueLabel);
+    truth.textContent = `vrai: ${trueLabel} · ${correct ? "✓ correct" : "✗ erreur"}`;
+    truth.className = `text-[11px] font-bold ${correct ? "text-green-600" : "text-red-600"}`;
+  } else {
+    truth.textContent = "image importée";
+    truth.className = "text-[11px] text-slate-500";
+  }
+
+  $("predProbLabel").textContent = `${(prob * 100).toFixed(1)} %`;
+  $("predProbBar").style.width = `${Math.min(100, prob * 100)}%`;
+  $("predProbBar").className = `block h-full rounded-full transition-[width] duration-200 ${isPneumonia ? "bg-red-500" : "bg-green-500"}`;
+  $("predThresholdMark").textContent = `seuil de décision = ${Number(result.threshold).toFixed(2)}`;
+}
+
+function bindTestPage() {
+  for (const btn of document.querySelectorAll(".tab-btn")) {
+    btn.addEventListener("click", () => setView(btn.dataset.view));
+  }
+  $("thresholdSlider").addEventListener("input", () => {
+    $("thresholdValue").textContent = currentThreshold().toFixed(2);
+  });
+  $("reloadModelsBtn").addEventListener("click", loadModels);
+  $("evalBtn").addEventListener("click", runEvaluate);
+  $("predLoadSamples").addEventListener("click", loadPredSamples);
+  $("testDataset").addEventListener("change", loadPredSamples);
+  $("predUpload").addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    if (file) predictUpload(file);
+  });
+  setView("train");
+}
+
 async function boot() {
   $("startBtn").addEventListener("click", startTraining);
   $("stopBtn").addEventListener("click", stopTraining);
@@ -436,6 +654,7 @@ async function boot() {
   });
   $("dataDir").addEventListener("change", loadSamples);
 
+  bindTestPage();
   observeCharts();
 
   await loadProject();
