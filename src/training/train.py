@@ -46,15 +46,20 @@ def configure_runtime_cache() -> None:
 
 def train(cfg: dict):
     configure_runtime_cache()
-    pl.seed_everything(42, workers=True)
+    # cudnn.benchmark autotunes conv kernels for fixed input sizes — only safe
+    # (and only worth it) when we are NOT requesting deterministic training.
+    deterministic = bool(cfg["training"].get("deterministic", False))
+    pl.seed_everything(42, workers=deterministic)
     if torch.cuda.is_available():
         torch.set_float32_matmul_precision("high")
+        torch.backends.cudnn.benchmark = not deterministic
 
     dm = ChestXrayDataModule(
         data_dir=cfg["data"]["data_dir"],
         image_size=cfg["data"]["image_size"],
         batch_size=cfg["data"]["batch_size"],
         num_workers=cfg["data"]["num_workers"],
+        prefetch_factor=cfg["data"].get("prefetch_factor", 4),
     )
     dm.setup()
 
@@ -67,6 +72,11 @@ def train(cfg: dict):
         pos_weight=dm.pos_weight,
         threshold=cfg["threshold"]["default"],
     )
+    # channels_last memory format speeds up convnets on tensor cores.
+    if torch.cuda.is_available():
+        model = model.to(memory_format=torch.channels_last)
+    if cfg["training"].get("compile", False):
+        model = torch.compile(model)
 
     mlflow.set_tracking_uri(cfg["mlflow"]["tracking_uri"])
     mlflow.set_experiment(cfg["mlflow"]["experiment_name"])
@@ -119,7 +129,7 @@ def train(cfg: dict):
             precision=precision,
             callbacks=callbacks,
             logger=logger,
-            deterministic=True,
+            deterministic=deterministic,
             log_every_n_steps=10,
         )
 

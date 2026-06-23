@@ -4,7 +4,6 @@ PyTorch Lightning DataModule for chest X-ray classification.
 Computes pos_weight from training set counts to handle PNEUMONIA/NORMAL imbalance.
 """
 
-import os
 from pathlib import Path
 
 import torch
@@ -26,25 +25,30 @@ class ChestXrayDataModule(pl.LightningDataModule):
         image_size: int = 224,
         batch_size: int = 32,
         num_workers: int = 4,
+        prefetch_factor: int = 4,
     ):
         super().__init__()
         self.data_dir = data_dir
         self.image_size = image_size
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.prefetch_factor = prefetch_factor
         self.pos_weight: torch.Tensor | None = None
 
     def _loader_kwargs(self, shuffle: bool) -> dict:
         use_cuda = torch.cuda.is_available()
-        use_workers = use_cuda and os.name != "nt"
-        effective_workers = self.num_workers if use_workers else 0
-        return {
+        workers = max(0, self.num_workers)
+        kwargs = {
             "batch_size": self.batch_size,
             "shuffle": shuffle,
-            "num_workers": effective_workers,
+            "num_workers": workers,
             "pin_memory": use_cuda,
-            "persistent_workers": effective_workers > 0,
+            "persistent_workers": workers > 0,
         }
+        # prefetch_factor is only valid when worker processes are used.
+        if workers > 0:
+            kwargs["prefetch_factor"] = self.prefetch_factor
+        return kwargs
 
     def setup(self, stage: str | None = None):
         is_preprocessed = (Path(self.data_dir) / "augmentation_summary.json").exists()

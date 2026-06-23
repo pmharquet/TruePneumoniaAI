@@ -1,7 +1,8 @@
 data:
   data_dir: "chest_Xray_augmented"
   image_size: 224
-  num_workers: 0
+  num_workers: 8
+  prefetch_factor: 4
   batch_size: 128
 
 model:
@@ -17,6 +18,8 @@ training:
   # pos_weight: weight for PNEUMONIA class (handles imbalance)
   # computed dynamically from dataset in datamodule
   precision: "16-mixed" # AMP for faster training on GPU
+  deterministic: false # false enables cudnn.benchmark (faster); true for reproducibility
+  compile: false # torch.compile the model (slower first batch, faster afterwards)
 
 threshold:
   # Clinical context: prioritize sensitivity (recall on PNEUMONIA)

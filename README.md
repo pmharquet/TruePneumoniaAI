@@ -32,6 +32,31 @@ pip install -r requirements.txt
 
 ---
 
+## Docker (stack v0.2, GPU)
+
+Lance toute la stack (dashboard d'entraînement GPU + MLflow + API d'inférence) en une commande :
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+| Service   | URL                     | Rôle                                            |
+|-----------|-------------------------|-------------------------------------------------|
+| dashboard | http://localhost:8501   | Piloter l'entraînement (utilise le GPU)         |
+| mlflow    | http://localhost:5000   | Suivi des expériences                            |
+| api       | http://localhost:8000   | Inférence (FastAPI)                              |
+
+**Pré-requis :** Docker Desktop avec support GPU (WSL2 + NVIDIA Container Toolkit). L'image est en **CUDA 12.8 / PyTorch cu128**, requis pour la RTX 5080 (Blackwell). Les datasets, checkpoints, exports, `outputs/` et `mlruns/` sont montés en volumes (rien n'est figé dans l'image).
+
+Vérifier que le GPU est bien vu dans le conteneur :
+
+```bash
+docker compose -f docker/docker-compose.yml run --rm dashboard \
+  python -c "import torch; print(torch.cuda.get_device_name(0))"
+```
+
+---
+
 ## Interface de test
 
 ```bash
