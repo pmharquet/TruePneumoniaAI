@@ -44,16 +44,23 @@ def _load_model(ckpt_path: Path):
         return model, device
 
 
-def _clahe_enabled() -> bool:
+def _data_cfg() -> dict:
     """Match the preprocessing used at training time (read from default config)."""
     import yaml
 
     cfg_path = Path(__file__).resolve().parents[2] / "configs" / "default.yaml"
     try:
-        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-        return bool(cfg.get("data", {}).get("clahe", False))
+        return yaml.safe_load(cfg_path.read_text(encoding="utf-8")).get("data", {})
     except Exception:
-        return False
+        return {}
+
+
+def _clahe_enabled() -> bool:
+    return bool(_data_cfg().get("clahe", False))
+
+
+def _config_image_size(default: int = 224) -> int:
+    return int(_data_cfg().get("image_size", default))
 
 
 def _val_transform(image_size: int = 224):
@@ -74,11 +81,12 @@ def predict_image(
     ckpt_path: Path,
     image: Image.Image,
     threshold: float | None = None,
-    image_size: int = 224,
+    image_size: int | None = None,
     tta: bool = True,
 ) -> dict[str, Any]:
     import torch
 
+    image_size = image_size or _config_image_size()
     model, device = _load_model(ckpt_path)
     tensor = _to_tensor(image, image_size).unsqueeze(0).to(device)
     with torch.no_grad():
@@ -100,7 +108,7 @@ def evaluate_split(
     data_dir: str,
     split: str = "test",
     threshold: float | None = None,
-    image_size: int = 224,
+    image_size: int | None = None,
     batch_size: int = 64,
     tta: bool = True,
 ) -> dict[str, Any]:
@@ -110,6 +118,7 @@ def evaluate_split(
 
     from src.data.dataset import ChestXrayDataset
 
+    image_size = image_size or _config_image_size()
     model, device = _load_model(ckpt_path)
     dataset = ChestXrayDataset(data_dir, split, transform=_val_transform(image_size))
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)

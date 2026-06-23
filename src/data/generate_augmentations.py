@@ -346,7 +346,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="chest_Xray", type=Path)
     parser.add_argument("--output", default="chest_Xray_augmented", type=Path)
-    parser.add_argument("--image-size", default=224, type=int)
+    parser.add_argument("--image-size", default=128, type=int)
     parser.add_argument("--mode", choices=("balance", "fixed"), default="balance")
     parser.add_argument("--copies-per-image", default=1, type=int)
     parser.add_argument("--seed", default=42, type=int)

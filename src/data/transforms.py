@@ -62,13 +62,19 @@ def get_offline_resize_transform(image_size: int = 224) -> A.Compose:
     return A.Compose(get_letterbox_ops(image_size))
 
 
-def get_preprocessed_transforms_albumentations(clahe: bool = False) -> A.Compose:
-    """Normalize images that are already saved at model input size.
+def get_preprocessed_transforms_albumentations(
+    clahe: bool = False, image_size: int | None = None
+) -> A.Compose:
+    """Normalize images that are already saved at (square) model input size.
 
     `clahe` applies deterministic local-contrast equalization — applied to ALL
     splits it reduces the train->test contrast gap that hurts NORMAL recall.
+    `image_size` resizes the (already square) stored image, enabling speed/size
+    sweeps without regenerating the dataset.
     """
     ops = []
+    if image_size is not None:
+        ops.append(A.Resize(image_size, image_size))
     if clahe:
         ops.append(A.CLAHE(clip_limit=2.0, p=1.0))
     ops += [

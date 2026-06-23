@@ -113,14 +113,15 @@ class ChestXrayDataModule(pl.LightningDataModule):
     def setup(self, stage: str | None = None):
         is_preprocessed = (Path(self.data_dir) / "augmentation_summary.json").exists()
         train_tf = (
-            get_preprocessed_transforms_albumentations(clahe=self.clahe)
+            get_preprocessed_transforms_albumentations(clahe=self.clahe, image_size=self.image_size)
             if is_preprocessed
             else get_train_transforms_albumentations(self.image_size)
         )
         # Preprocessed images are already letterboxed to model size, so the
-        # eval transform only needs normalization; raw images need letterboxing.
+        # eval transform only needs (optional resize +) normalization; raw
+        # images need letterboxing.
         val_tf = (
-            get_preprocessed_transforms_albumentations(clahe=self.clahe)
+            get_preprocessed_transforms_albumentations(clahe=self.clahe, image_size=self.image_size)
             if is_preprocessed
             else get_val_transforms_albumentations(self.image_size, clahe=self.clahe)
         )
