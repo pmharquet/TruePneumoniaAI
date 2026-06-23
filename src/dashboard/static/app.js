@@ -188,6 +188,7 @@ function updateStatus(payload) {
   renderProgress(runState);
   renderPerformance(runState.performance || {});
   renderMetrics(runState.latest_metrics || {});
+  renderTestMetrics(runState);
   renderCharts(payload.events || []);
   renderArtifacts(payload.artifacts || {});
   renderSystem(payload.system || state.project?.system || {});
@@ -246,6 +247,23 @@ function renderMetrics(metrics) {
   $("metricF1").textContent = fmt(metric(metrics, "val/f1"));
   $("metricAccuracy").textContent = fmt(metric(metrics, "val/accuracy"));
   $("metricLr").textContent = fmt(metric(metrics, "lr"), 6);
+}
+
+function renderTestMetrics(runState) {
+  const m = runState.test_metrics;
+  const section = $("testMetricsSection");
+  if (!m || Object.keys(m).length === 0) {
+    section.classList.add("hidden");
+    return;
+  }
+  section.classList.remove("hidden");
+  $("testAuroc").textContent = fmt(metric(m, "test/auroc"), 3);
+  $("testSens").textContent = fmt(metric(m, "test/sensitivity"), 3);
+  $("testSpec").textContent = fmt(metric(m, "test/specificity"), 3);
+  $("testF1").textContent = fmt(metric(m, "test/f1"), 3);
+  $("testAcc").textContent = fmt(metric(m, "test/accuracy"), 3);
+  const thr = runState.test_threshold;
+  $("testThreshold").textContent = thr != null ? `seuil ${Number(thr).toFixed(2)} · test complet` : "test complet";
 }
 
 function seriesFromEvents(events, keyNames) {
@@ -367,12 +385,27 @@ function renderCharts(events) {
   ];
   drawChart($("lossChart"), lossSeries);
 
+  // Test curves (per epoch) — val saturates near 1.0 and is uninformative.
   const metricSeries = [
-    { label: "val/auroc", color: "#12805c", points: seriesFromEvents(events, ["val/auroc"]) },
-    { label: "sensitivity", color: "#2563eb", points: seriesFromEvents(events, ["val/sensitivity"]) },
-    { label: "specificity", color: "#b42318", points: seriesFromEvents(events, ["val/specificity"]) },
+    { label: "test/accuracy", color: "#12805c", points: seriesFromEvents(events, ["test/accuracy"]) },
+    { label: "test/specificity", color: "#b42318", points: seriesFromEvents(events, ["test/specificity"]) },
+    { label: "test/auroc", color: "#2563eb", points: seriesFromEvents(events, ["test/auroc"]) },
   ];
-  drawChart($("metricChart"), metricSeries, { minY: 0, maxY: 1 });
+  // Auto-zoom: fit the axis to the data range (with padding) so the variation
+  // is visible instead of being flattened against a fixed 0..1 axis.
+  drawChart($("metricChart"), metricSeries, paddedRange(metricSeries));
+}
+
+function paddedRange(seriesList, { floor = 0, ceil = 1, pad = 0.02 } = {}) {
+  const ys = seriesList.flatMap((s) => s.points.map((p) => p.y));
+  if (ys.length === 0) return { minY: 0, maxY: 1 };
+  let lo = Math.max(floor, Math.min(...ys) - pad);
+  let hi = Math.min(ceil, Math.max(...ys) + pad);
+  if (hi - lo < 0.04) {
+    lo = Math.max(floor, lo - 0.03);
+    hi = Math.min(ceil, hi + 0.03);
+  }
+  return { minY: lo, maxY: hi };
 }
 
 function formPayload() {
@@ -441,7 +474,10 @@ function setView(view) {
     const active = btn.dataset.view === view;
     btn.className = `tab-btn min-h-7 rounded px-3 ${active ? TAB_ACTIVE : TAB_INACTIVE}`;
   }
-  if (view === "test" && !state.testLoaded) initTestPage();
+  if (view === "test") {
+    if (!state.testLoaded) initTestPage();
+    else loadModels(); // refresh the dropdown each visit — checkpoints change during training
+  }
 }
 
 async function initTestPage() {
@@ -520,7 +556,12 @@ async function runEvaluate() {
       .join("");
   } catch (error) {
     $("evalMeta").textContent = "";
-    alert(`Évaluation impossible: ${error.message}`);
+    if (/not found/i.test(error.message)) {
+      await loadModels();
+      alert("Ce checkpoint n'existe plus (remplacé pendant l'entraînement). Liste rafraîchie — resélectionne un modèle.");
+    } else {
+      alert(`Évaluation impossible: ${error.message}`);
+    }
   } finally {
     btn.disabled = false;
   }

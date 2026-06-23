@@ -315,12 +315,21 @@ class DashboardEventLogger(Callback):
         })
 
     def on_test_end(self, trainer, pl_module) -> None:
-        self._write_event("test_end", {
+        payload = {
             "status": "running",
             "stage": "test",
             "global_step": _safe_int(trainer.global_step),
             "metrics": self._metrics(trainer),
-        })
+        }
+        threshold = getattr(pl_module, "threshold", None)
+        if threshold is not None:
+            payload["threshold"] = float(threshold)
+        self._write_event("test_end", payload)
+        # Surface the final test metrics in state.json so the dashboard can show
+        # them without scanning the whole event log.
+        self._state["test_metrics"] = payload["metrics"]
+        self._state["test_threshold"] = payload.get("threshold")
+        self._write_state()
 
     def on_fit_end(self, trainer, pl_module) -> None:
         self._write_event("fit_end", {

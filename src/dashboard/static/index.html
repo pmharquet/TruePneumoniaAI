@@ -209,13 +209,27 @@
           </div>
         </section>
 
+        <section id="testMetricsSection" class="hidden rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Test (final)</h2>
+            <span id="testThreshold" class="text-[11px] font-semibold text-emerald-700"></span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 md:grid-cols-5">
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Test AUROC</span><strong id="testAuroc" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Sensibilité</span><strong id="testSens" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Spécificité</span><strong id="testSpec" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">F1</span><strong id="testF1" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Accuracy</span><strong id="testAcc" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+          </div>
+        </section>
+
         <section class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Loss</h2></div>
             <canvas id="lossChart" class="block h-[200px] w-full"></canvas>
           </div>
           <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Métriques validation</h2></div>
+            <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Métriques test (par epoch)</h2><span class="text-[11px] text-slate-500">seuil 0.5</span></div>
             <canvas id="metricChart" class="block h-[200px] w-full"></canvas>
           </div>
         </section>
@@ -227,7 +241,7 @@
           </div>
           <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Logs</h2></div>
-            <pre id="logs" class="m-0 h-[200px] overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-2.5 font-mono text-[11.5px] leading-relaxed text-emerald-100"></pre>
+            <pre id="logs" class="m-0 min-h-[200px] max-h-[400px] overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-2.5 font-mono text-[11.5px] leading-relaxed text-emerald-100"></pre>
           </div>
         </section>
       </section>

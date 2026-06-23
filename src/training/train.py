@@ -45,14 +45,17 @@ def configure_runtime_cache() -> None:
 
 
 @torch.no_grad()
-def gather_probs(model, dataloader):
+def gather_probs(model, dataloader, tta: bool = True):
     """Run the model over a dataloader and return (probs, int labels) on CPU."""
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.eval().to(device)
     probs_all, labels_all = [], []
     for imgs, labels in dataloader:
         imgs = imgs.to(device).contiguous(memory_format=torch.channels_last)
-        probs_all.append(torch.sigmoid(model(imgs)).cpu())
+        probs = torch.sigmoid(model(imgs))
+        if tta:  # average over the horizontal flip
+            probs = (probs + torch.sigmoid(model(torch.flip(imgs, dims=[3])))) / 2
+        probs_all.append(probs.cpu())
         labels_all.append(labels.cpu())
     return torch.cat(probs_all), torch.cat(labels_all).int()
 
@@ -109,6 +112,47 @@ def stratified_split(labels, calib_frac: float, seed: int = 42):
     return torch.cat(calib_idx), torch.cat(eval_idx)
 
 
+class TestCurveLogger(pl.Callback):
+    """Evaluate the test set after every validation epoch and log test/accuracy,
+    test/specificity, test/auroc so the dashboard can plot real test curves.
+
+    The internal val set (from train) saturates near 1.0 and is uninformative;
+    the test curve actually shows generalization. This is monitoring only —
+    model selection still uses val/loss, so test is not used for tuning.
+    """
+
+    def __init__(self, test_dataloader, threshold: float = 0.5) -> None:
+        super().__init__()
+        self.loader = test_dataloader
+        self.threshold = threshold
+
+    @torch.no_grad()
+    def on_validation_epoch_end(self, trainer, pl_module) -> None:
+        if trainer.sanity_checking:
+            return
+        from torchmetrics.functional.classification import binary_auroc
+
+        was_training = pl_module.training
+        pl_module.eval()
+        probs, labels = [], []
+        for imgs, lbl in self.loader:
+            imgs = imgs.to(pl_module.device).contiguous(memory_format=torch.channels_last)
+            probs.append(torch.sigmoid(pl_module(imgs)).cpu())
+            labels.append(lbl.cpu())
+        probs = torch.cat(probs)
+        labels = torch.cat(labels).int()
+        preds = (probs >= self.threshold).int()
+        neg = labels == 0
+        acc = (preds == labels).float().mean().item()
+        spec = (preds[neg] == 0).float().mean().item() if neg.any() else 0.0
+
+        pl_module.log("test/accuracy", acc)
+        pl_module.log("test/specificity", spec)
+        pl_module.log("test/auroc", float(binary_auroc(probs, labels)))
+        if was_training:
+            pl_module.train()
+
+
 def train(cfg: dict):
     configure_runtime_cache()
     # cudnn.benchmark autotunes conv kernels for fixed input sizes — only safe
@@ -126,6 +170,7 @@ def train(cfg: dict):
         num_workers=cfg["data"]["num_workers"],
         prefetch_factor=cfg["data"].get("prefetch_factor", 4),
         val_split=cfg["data"].get("val_split", 0.15),
+        clahe=cfg["data"].get("clahe", False),
     )
     dm.setup()
 
@@ -167,6 +212,9 @@ def train(cfg: dict):
 
         ckpt_dir = cfg["paths"]["checkpoints"]
         callbacks = [
+            # Before DashboardEventLogger so the test metrics it logs are present
+            # in callback_metrics when the event logger reads them.
+            TestCurveLogger(dm.test_dataloader()),
             DashboardEventLogger(
                 log_every_n_steps=cfg.get("dashboard", {}).get("log_every_n_steps", 1),
             ),

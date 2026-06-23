@@ -44,12 +44,24 @@ def _load_model(ckpt_path: Path):
         return model, device
 
 
+def _clahe_enabled() -> bool:
+    """Match the preprocessing used at training time (read from default config)."""
+    import yaml
+
+    cfg_path = Path(__file__).resolve().parents[2] / "configs" / "default.yaml"
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        return bool(cfg.get("data", {}).get("clahe", False))
+    except Exception:
+        return False
+
+
 def _val_transform(image_size: int = 224):
     # Letterbox + normalize works for any input size (no-op letterbox on images
     # already at model size), so it covers both dataset and uploaded images.
     from src.data.transforms import get_val_transforms_albumentations
 
-    return get_val_transforms_albumentations(image_size)
+    return get_val_transforms_albumentations(image_size, clahe=_clahe_enabled())
 
 
 def _to_tensor(image: Image.Image, image_size: int):
@@ -63,13 +75,17 @@ def predict_image(
     image: Image.Image,
     threshold: float | None = None,
     image_size: int = 224,
+    tta: bool = True,
 ) -> dict[str, Any]:
     import torch
 
     model, device = _load_model(ckpt_path)
     tensor = _to_tensor(image, image_size).unsqueeze(0).to(device)
     with torch.no_grad():
-        prob = torch.sigmoid(model(tensor)).item()
+        prob = torch.sigmoid(model(tensor))
+        if tta:  # average over the horizontal flip
+            prob = (prob + torch.sigmoid(model(torch.flip(tensor, dims=[3])))) / 2
+        prob = prob.item()
 
     thr = float(threshold) if threshold is not None else float(getattr(model, "threshold", 0.5))
     return {
@@ -86,6 +102,7 @@ def evaluate_split(
     threshold: float | None = None,
     image_size: int = 224,
     batch_size: int = 64,
+    tta: bool = True,
 ) -> dict[str, Any]:
     import torch
     from torch.utils.data import DataLoader
@@ -101,7 +118,10 @@ def evaluate_split(
     with torch.no_grad():
         for imgs, labels in loader:
             imgs = imgs.to(device)
-            probs_all.append(torch.sigmoid(model(imgs)).cpu())
+            p = torch.sigmoid(model(imgs))
+            if tta:  # average over the horizontal flip
+                p = (p + torch.sigmoid(model(torch.flip(imgs, dims=[3])))) / 2
+            probs_all.append(p.cpu())
             labels_all.append(labels)
     probs = torch.cat(probs_all)
     labels = torch.cat(labels_all).int()

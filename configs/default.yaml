@@ -7,6 +7,8 @@ data:
   # Fraction of train *source* images held out for validation. The split is
   # grouped by source so augmented variants never leak across train/val.
   val_split: 0.15
+  # Deterministic CLAHE on all splits — reduces train->test contrast shift.
+  clahe: true
 
 model:
   backbone: "densenet121" # densenet121 | resnet50

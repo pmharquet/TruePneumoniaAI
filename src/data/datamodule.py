@@ -31,6 +31,7 @@ class ChestXrayDataModule(pl.LightningDataModule):
         prefetch_factor: int = 4,
         val_split: float = 0.15,
         split_seed: int = 42,
+        clahe: bool = False,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -40,6 +41,7 @@ class ChestXrayDataModule(pl.LightningDataModule):
         self.prefetch_factor = prefetch_factor
         self.val_split = val_split
         self.split_seed = split_seed
+        self.clahe = clahe
         self.pos_weight: torch.Tensor | None = None
 
     def _loader_kwargs(self, shuffle: bool) -> dict:
@@ -111,16 +113,16 @@ class ChestXrayDataModule(pl.LightningDataModule):
     def setup(self, stage: str | None = None):
         is_preprocessed = (Path(self.data_dir) / "augmentation_summary.json").exists()
         train_tf = (
-            get_preprocessed_transforms_albumentations()
+            get_preprocessed_transforms_albumentations(clahe=self.clahe)
             if is_preprocessed
             else get_train_transforms_albumentations(self.image_size)
         )
         # Preprocessed images are already letterboxed to model size, so the
         # eval transform only needs normalization; raw images need letterboxing.
         val_tf = (
-            get_preprocessed_transforms_albumentations()
+            get_preprocessed_transforms_albumentations(clahe=self.clahe)
             if is_preprocessed
-            else get_val_transforms_albumentations(self.image_size)
+            else get_val_transforms_albumentations(self.image_size, clahe=self.clahe)
         )
 
         if self.val_split and self.val_split > 0:

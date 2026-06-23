@@ -62,20 +62,31 @@ def get_offline_resize_transform(image_size: int = 224) -> A.Compose:
     return A.Compose(get_letterbox_ops(image_size))
 
 
-def get_preprocessed_transforms_albumentations() -> A.Compose:
-    """Normalize images that are already saved at model input size."""
-    return A.Compose([
+def get_preprocessed_transforms_albumentations(clahe: bool = False) -> A.Compose:
+    """Normalize images that are already saved at model input size.
+
+    `clahe` applies deterministic local-contrast equalization — applied to ALL
+    splits it reduces the train->test contrast gap that hurts NORMAL recall.
+    """
+    ops = []
+    if clahe:
+        ops.append(A.CLAHE(clip_limit=2.0, p=1.0))
+    ops += [
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
-    ])
+    ]
+    return A.Compose(ops)
 
 
-def get_val_transforms_albumentations(image_size: int = 224) -> A.Compose:
-    return A.Compose([
-        *get_letterbox_ops(image_size),
+def get_val_transforms_albumentations(image_size: int = 224, clahe: bool = False) -> A.Compose:
+    ops = list(get_letterbox_ops(image_size))
+    if clahe:
+        ops.append(A.CLAHE(clip_limit=2.0, p=1.0))
+    ops += [
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
-    ])
+    ]
+    return A.Compose(ops)
 
 
 def get_monai_train_transforms(image_size: int = 224) -> Compose:
