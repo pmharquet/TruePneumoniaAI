@@ -1,5 +1,5 @@
 data:
-  data_dir: "chest_Xray_augmented"
+  data_dir: "dataset/chest_Xray_augmented"
   image_size: 128 # sweet spot from the size sweep (~4x faster, <0.3pt accuracy loss)
   num_workers: 8
   prefetch_factor: 4
@@ -40,6 +40,7 @@ mlflow:
   experiment_name: "TruePneumoniaAI-v0.2"
 
 paths:
-  checkpoints: "checkpoints"
+  # Per-task base dir. Each run nests under checkpoints/normal-pneumonia/<timestamp>/.
+  checkpoints: "checkpoints/normal-pneumonia"
   onnx_export: "exports/model.onnx"
   gradcam_output: "outputs/gradcam"

@@ -1,0 +1,38 @@
+dashboard:
+  log_every_n_steps: 10
+data:
+  batch_size: 128
+  clahe: true
+  classes:
+  - VIRUS
+  - BACTERIA
+  data_dir: dataset/chest_Xray_subtype
+  image_size: 128
+  num_workers: 8
+  prefetch_factor: 4
+  val_split: 0.0
+mlflow:
+  experiment_name: TruePneumoniaAI-subtype
+  tracking_uri: mlruns
+model:
+  backbone: densenet121
+  dropout: 0.5
+  num_classes: 1
+  pretrained: true
+paths:
+  checkpoints: checkpoints/bacteria-virus
+  gradcam_output: outputs/gradcam_subtype
+  onnx_export: exports/model_subtype.onnx
+threshold:
+  default: 0.5
+  target_sensitivity: 0.95
+training:
+  compile: false
+  deterministic: false
+  freeze_backbone: true
+  label_smoothing: 0.05
+  learning_rate: 0.0001
+  max_epochs: 1
+  precision: 16-mixed
+  seed: 42
+  weight_decay: 1.0e-05

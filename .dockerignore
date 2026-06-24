@@ -7,8 +7,8 @@ __pycache__/
 *.pyc
 
 # Datasets (mounted as volumes)
-chest_Xray/
-chest_Xray_augmented/
+dataset/
+chest_Xray*/
 
 # Runtime artifacts (mounted as volumes)
 outputs/

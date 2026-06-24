@@ -30,39 +30,45 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+# Pointer to the most recent run dir (the run data itself lives next to the
+# checkpoints under checkpoints/<task>/<timestamp>/).
 DASHBOARD_ROOT = ROOT / "outputs" / "dashboard"
-RUNS_DIR = DASHBOARD_ROOT / "runs"
 LATEST_RUN_FILE = DASHBOARD_ROOT / "latest_run.txt"
 DEFAULT_CONFIG = ROOT / "configs" / "default.yaml"
+DATASET_DIR = ROOT / "dataset"  # all chest_Xray* datasets live here
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 CLASSES = ("NORMAL", "PNEUMONIA")
 SPLITS = ("train", "val", "test")
 
-# Each dataset declares its classification task: which config trains it and
-# which two classes it holds. Class order is (negative=idx0, positive=idx1) —
-# it must match the training config's `data.classes` so the model's single
-# logit (= P(positive)) is interpreted with the right label. Datasets not
-# listed here fall back to the binary NORMAL/PNEUMONIA task on DEFAULT_CONFIG.
+# Each dataset (keyed by its folder basename) declares its classification task:
+# which config trains it and which two classes it holds. Class order is
+# (negative=idx0, positive=idx1) — it must match the training config's
+# `data.classes` so the model's single logit (= P(positive)) is interpreted
+# with the right label. Datasets not listed here fall back to the binary
+# NORMAL/PNEUMONIA task on DEFAULT_CONFIG.
 DATASET_CONFIG = {
     "chest_Xray_subtype": ROOT / "configs" / "subtype.yaml",
 }
 DATASET_CLASSES = {
     "chest_Xray_subtype": ("VIRUS", "BACTERIA"),
 }
+# Datasets are identified by their path relative to the project root
+# (e.g. "dataset/chest_Xray_subtype") so it can be passed straight to the
+# training data_dir and to ChestXrayDataset.
 DATASETS = (
-    "chest_Xray_patient",
-    "chest_Xray_augmented",
-    "chest_Xray",
-    "chest_Xray_subtype",
+    "dataset/chest_Xray_patient",
+    "dataset/chest_Xray_augmented",
+    "dataset/chest_Xray",
+    "dataset/chest_Xray_subtype",
 )
 
 
 def _classes_for(dataset_name: str) -> tuple[str, ...]:
-    return DATASET_CLASSES.get(dataset_name, CLASSES)
+    return DATASET_CLASSES.get(Path(dataset_name).name, CLASSES)
 
 
 def _config_for(dataset_name: str) -> Path:
-    return DATASET_CONFIG.get(dataset_name, DEFAULT_CONFIG)
+    return DATASET_CONFIG.get(Path(dataset_name).name, DEFAULT_CONFIG)
 
 
 def _classes_for_checkpoint(ckpt_path: Path) -> tuple[str, ...]:
@@ -184,9 +190,12 @@ def _dataset_counts(dataset: Path) -> dict[str, Any]:
         except json.JSONDecodeError:
             summary = None
 
+    # Forward-slash path so it matches config data_dir style and is portable as
+    # the dataset identifier the frontend sends back.
+    rel = dataset.relative_to(ROOT).as_posix() if ROOT in (dataset, *dataset.parents) else str(dataset)
     return {
         "name": dataset.name,
-        "path": str(dataset.relative_to(ROOT)) if ROOT in (dataset, *dataset.parents) else str(dataset),
+        "path": rel,
         "exists": dataset.exists(),
         "total": total,
         "classes": list(classes),
@@ -196,12 +205,12 @@ def _dataset_counts(dataset: Path) -> dict[str, Any]:
 
 
 def _available_datasets() -> list[dict[str, Any]]:
-    return [_dataset_counts(ROOT / name) for name in DATASETS]
+    return [_dataset_counts(ROOT / rel) for rel in DATASETS]
 
 
 def _default_data_dir() -> str:
-    augmented = ROOT / "chest_Xray_augmented"
-    return "chest_Xray_augmented" if augmented.exists() else "chest_Xray"
+    augmented = DATASET_DIR / "chest_Xray_augmented"
+    return "dataset/chest_Xray_augmented" if augmented.exists() else "dataset/chest_Xray"
 
 
 def _read_state(run_dir: Path | None) -> dict[str, Any]:
@@ -248,11 +257,13 @@ def _latest_run_dir() -> Path | None:
         candidate = (ROOT / LATEST_RUN_FILE.read_text(encoding="utf-8").strip()).resolve()
         if candidate.exists() and ROOT.resolve() in (candidate, *candidate.parents):
             return candidate
-    if RUNS_DIR.exists():
-        runs = sorted((p for p in RUNS_DIR.iterdir() if p.is_dir()), key=lambda p: p.stat().st_mtime)
-        if runs:
-            return runs[-1]
-    return None
+    # Fallback: newest run dir across all tasks — a run dir is a timestamp
+    # folder under checkpoints/<task>/ holding a state.json.
+    runs = sorted(
+        (p.parent for p in (ROOT / "checkpoints").glob("*/*/state.json")),
+        key=lambda p: p.stat().st_mtime,
+    )
+    return runs[-1] if runs else None
 
 
 def _tail_file(path: Path, lines: int = 120) -> list[str]:
@@ -468,8 +479,11 @@ async def start_training(request: Request) -> dict[str, Any]:
                 ),
             )
 
+    # The run lives with its checkpoints under checkpoints/<task>/<timestamp>/:
+    # .ckpt files, config snapshot, events.jsonl, state.json and train.log all
+    # land here. The task base comes from the chosen config's checkpoints path.
     run_id = _now_id()
-    run_dir = RUNS_DIR / run_id
+    run_dir = _safe_relative_path(Path(cfg["paths"]["checkpoints"]) / run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     run_config = run_dir / "config.yaml"
     _write_yaml(run_config, cfg)
@@ -481,7 +495,8 @@ async def start_training(request: Request) -> dict[str, Any]:
     env["PYTHONUNBUFFERED"] = "1"
     env["NO_ALBUMENTATIONS_UPDATE"] = "1"
     env["MLFLOW_ALLOW_FILE_STORE"] = "true"
-    env["TPAI_DASHBOARD_DIR"] = str(run_dir)
+    # train.py writes checkpoints + dashboard events into this exact dir.
+    env["TPAI_RUN_DIR"] = str(run_dir)
     cache_root = ROOT / "outputs" / "cache"
     torch_home = cache_root / "torch"
     xdg_cache = cache_root / "xdg"
@@ -532,7 +547,7 @@ def stop_training() -> dict[str, Any]:
 
 @app.get("/api/dataset/sample")
 def dataset_sample(
-    dataset: str = Query(default="chest_Xray_augmented"),
+    dataset: str = Query(default="dataset/chest_Xray_augmented"),
     split: str = Query(default="train"),
     class_name: str = Query(default="NORMAL"),
     limit: int = Query(default=4, ge=1, le=12),

@@ -1,7 +1,7 @@
 # Stage-2 model: among PNEUMONIA cases, distinguish BACTERIAL vs VIRAL.
 # Same architecture/pipeline as the binary model — only the class layout differs.
 data:
-  data_dir: "chest_Xray_subtype" # leak-free patient-level re-split of PNEUMONIA images
+  data_dir: "dataset/chest_Xray_subtype" # leak-free patient-level re-split of PNEUMONIA images
   image_size: 128
   num_workers: 8
   prefetch_factor: 4
@@ -40,7 +40,7 @@ mlflow:
   experiment_name: "TruePneumoniaAI-subtype"
 
 paths:
-  checkpoints: "checkpoints_subtype"
+  checkpoints: "checkpoints/bacteria-virus"
   onnx_export: "exports/model_subtype.onnx"
   gradcam_output: "outputs/gradcam_subtype"
 

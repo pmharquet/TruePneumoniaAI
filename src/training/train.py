@@ -7,6 +7,7 @@ Usage:
 
 import argparse
 import os
+from datetime import datetime
 from pathlib import Path
 
 import mlflow
@@ -28,6 +29,29 @@ from src.training.dashboard_callback import DashboardEventLogger
 def load_config(path: str) -> dict:
     with open(path) as f:
         return yaml.safe_load(f)
+
+
+def resolve_run_dir(cfg: dict) -> Path:
+    """Per-run directory holding this run's checkpoints AND its dashboard
+    event/state files, so everything about a run lives together under
+    checkpoints/<task>/<timestamp>/.
+
+    The dashboard supplies the exact dir via TPAI_RUN_DIR; a CLI run nests a
+    fresh timestamp under the config's per-task checkpoints base. A config
+    snapshot is saved alongside so a run is self-describing.
+    """
+    env_dir = os.environ.get("TPAI_RUN_DIR")
+    if env_dir:
+        run_dir = Path(env_dir)
+    else:
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        run_dir = Path(cfg["paths"]["checkpoints"]) / ts
+    run_dir.mkdir(parents=True, exist_ok=True)
+    snapshot = run_dir / "config.yaml"
+    if not snapshot.exists():
+        with snapshot.open("w", encoding="utf-8") as f:
+            yaml.safe_dump(cfg, f, sort_keys=False)
+    return run_dir
 
 
 def configure_runtime_cache() -> None:
@@ -175,6 +199,8 @@ def train(cfg: dict):
     )
     dm.setup()
 
+    run_dir = resolve_run_dir(cfg)
+
     model = PneumoniaClassifier(
         backbone=cfg["model"]["backbone"],
         pretrained=cfg["model"]["pretrained"],
@@ -211,12 +237,13 @@ def train(cfg: dict):
             tracking_uri=cfg["mlflow"]["tracking_uri"],
         )
 
-        ckpt_dir = cfg["paths"]["checkpoints"]
+        ckpt_dir = run_dir
         callbacks = [
             # Before DashboardEventLogger so the test metrics it logs are present
             # in callback_metrics when the event logger reads them.
             TestCurveLogger(dm.test_dataloader()),
             DashboardEventLogger(
+                output_dir=run_dir,
                 log_every_n_steps=cfg.get("dashboard", {}).get("log_every_n_steps", 1),
             ),
             # Select/stop on val/loss, not val/auroc: AUROC saturates near 1.0

@@ -9,10 +9,11 @@ const $ = (id) => document.getElementById(id);
 
 // Classes a dataset holds, as [negative, positive]. The backend declares them
 // per dataset (NORMAL/PNEUMONIA for the binary task, VIRUS/BACTERIA for the
-// pneumonia-subtype task). Falls back to the binary pair if unknown.
-function datasetClasses(name) {
+// pneumonia-subtype task). `id` is the dataset path ("dataset/chest_Xray_*"),
+// which is what the <option> values carry. Falls back to the binary pair.
+function datasetClasses(id) {
   const datasets = state.project?.datasets || [];
-  const match = datasets.find((d) => d.name === name);
+  const match = datasets.find((d) => d.path === id || d.name === id);
   return match?.classes?.length === 2 ? match.classes : ["NORMAL", "PNEUMONIA"];
 }
 
@@ -59,10 +60,10 @@ function renderProject() {
   dataSelect.innerHTML = "";
   for (const dataset of state.project.datasets) {
     const option = document.createElement("option");
-    option.value = dataset.name;
+    option.value = dataset.path;
     option.textContent = `${dataset.name} (${dataset.total})`;
     option.disabled = !dataset.exists || dataset.total === 0;
-    if (dataset.name === cfg.data.data_dir) option.selected = true;
+    if (dataset.path === cfg.data.data_dir) option.selected = true;
     dataSelect.appendChild(option);
   }
 
@@ -158,7 +159,7 @@ function renderArtifacts(artifacts) {
 }
 
 async function loadSamples() {
-  const dataset = $("dataDir").value || "chest_Xray_augmented";
+  const dataset = $("dataDir").value || "dataset/chest_Xray_augmented";
   const className = datasetClasses(dataset)[0];
   const data = await getJson(`/api/dataset/sample?dataset=${encodeURIComponent(dataset)}&split=train&class_name=${className}&limit=4`);
   const target = $("sampleGrid");
@@ -544,10 +545,10 @@ async function populateTestDatasets() {
   let firstEnabled = null;
   for (const dataset of datasets || []) {
     const option = document.createElement("option");
-    option.value = dataset.name;
+    option.value = dataset.path;
     option.textContent = `${dataset.name} (${dataset.total})`;
     option.disabled = !dataset.exists || dataset.total === 0;
-    if (!option.disabled && firstEnabled === null) firstEnabled = dataset.name;
+    if (!option.disabled && firstEnabled === null) firstEnabled = dataset.path;
     datasetSelect.appendChild(option);
   }
   // Default to the first available dataset (chest_Xray_patient, the leak-free
@@ -633,7 +634,7 @@ async function runEvaluate() {
 }
 
 async function loadPredSamples() {
-  const dataset = $("testDataset").value || "chest_Xray_augmented";
+  const dataset = $("testDataset").value || "dataset/chest_Xray_augmented";
   const split = $("predSplit").value;
   const className = $("predClass").value;
   const grid = $("predGrid");

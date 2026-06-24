@@ -56,7 +56,8 @@ def _get_ort_session() -> ort.InferenceSession:
 def _get_pt_model() -> PneumoniaClassifier:
     global _pt_model
     if _pt_model is None:
-        ckpts = sorted(_CKPT_PATH.glob("best-*.ckpt"))
+        # rglob: checkpoints now live in per-run subdirs (checkpoints/<task>/<ts>/).
+        ckpts = sorted(_CKPT_PATH.rglob("best-*.ckpt"), key=lambda p: p.stat().st_mtime)
         if not ckpts:
             raise RuntimeError(f"No checkpoint found in {_CKPT_PATH}")
         _pt_model = PneumoniaClassifier.load_from_checkpoint(str(ckpts[-1]))

@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import copy
 import glob
+import os
 from pathlib import Path
 
 import torch
@@ -61,13 +62,16 @@ def main():
 
     ckpt_dirs = {}
     for seed in args.seeds:
-        ckpt_dir = f"checkpoints/ens_seed{seed}"
+        ckpt_dir = f"checkpoints/normal-pneumonia/ens_seed{seed}"
         ckpt_dirs[seed] = ckpt_dir
         if args.skip_train:
             continue
         cfg = copy.deepcopy(base_cfg)
         cfg["training"]["seed"] = seed
         cfg["paths"]["checkpoints"] = ckpt_dir
+        # Pin the run dir to a flat per-seed folder (no timestamp subdir) so
+        # best_ckpt finds the checkpoint where this script expects it.
+        os.environ["TPAI_RUN_DIR"] = ckpt_dir
         print(f"\n========== training seed {seed} -> {ckpt_dir} ==========")
         train(cfg)
         if torch.cuda.is_available():

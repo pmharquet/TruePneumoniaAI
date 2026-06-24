@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import time
 from pathlib import Path
 
@@ -20,12 +21,9 @@ import torch
 
 from src.training.train import load_config, train
 
-STATE = Path("outputs/dashboard/current/state.json")
-
-
-def read_state() -> dict:
+def read_state(state_path: Path) -> dict:
     try:
-        return json.loads(STATE.read_text(encoding="utf-8"))
+        return json.loads(state_path.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
@@ -42,9 +40,13 @@ def main():
     for size in args.sizes:
         cfg = copy.deepcopy(base_cfg)
         cfg["data"]["image_size"] = size
-        cfg["paths"]["checkpoints"] = f"checkpoints/size{size}"
+        cfg["paths"]["checkpoints"] = f"checkpoints/normal-pneumonia/size{size}"
         cfg["training"]["seed"] = 42
         cfg["mlflow"]["experiment_name"] = "TruePneumoniaAI-size-sweep"
+
+        # Pin the run dir to a flat per-size folder so state.json is found here.
+        run_dir = Path(cfg["paths"]["checkpoints"])
+        os.environ["TPAI_RUN_DIR"] = str(run_dir)
 
         print(f"\n{'=' * 60}\n  IMAGE SIZE {size}x{size}\n{'=' * 60}")
         t0 = time.time()
@@ -53,7 +55,7 @@ def main():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-        state = read_state()
+        state = read_state(run_dir / "state.json")
         perf = state.get("performance", {})
         tm = state.get("test_metrics", {})
         results.append({

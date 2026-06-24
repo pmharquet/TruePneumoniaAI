@@ -401,12 +401,13 @@ def main() -> None:
         help="binary = NORMAL vs PNEUMONIA; subtype = BACTERIA vs VIRUS "
         "(from PNEUMONIA filenames).",
     )
-    parser.add_argument("--input", default="chest_Xray", type=Path)
+    parser.add_argument("--input", default="dataset/chest_Xray", type=Path)
     parser.add_argument(
         "--output",
         default=None,
         type=Path,
-        help="Defaults to chest_Xray_augmented (binary) or chest_Xray_subtype (subtype).",
+        help="Defaults to dataset/chest_Xray_augmented (binary) or "
+        "dataset/chest_Xray_subtype (subtype).",
     )
     parser.add_argument("--image-size", default=128, type=int)
     parser.add_argument("--mode", choices=("balance", "fixed"), default="balance")
@@ -425,8 +426,8 @@ def main() -> None:
 
     scheme = SCHEMES[args.task]
     default_output = {
-        "binary": Path("chest_Xray_augmented"),
-        "subtype": Path("chest_Xray_subtype"),
+        "binary": Path("dataset/chest_Xray_augmented"),
+        "subtype": Path("dataset/chest_Xray_subtype"),
     }[args.task]
     output = args.output if args.output is not None else default_output
 
