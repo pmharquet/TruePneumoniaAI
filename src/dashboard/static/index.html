@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TruePneumoniaAI Dashboard</title>
+    <script type="module">import 'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4'</script>
+  </head>
+  <body class="m-0 min-w-[320px] bg-[#f5f7f8] text-slate-900 text-[13px] antialiased">
+    <header class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div class="mx-auto flex max-w-[1280px] items-center justify-between gap-3 px-4 py-2.5">
+        <div>
+          <h1 class="text-base font-bold leading-tight">TruePneumoniaAI</h1>
+          <p class="text-[11px] text-slate-500">Training dashboard</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <nav class="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-xs font-bold">
+            <button id="tabTrain" type="button" data-view="train" class="tab-btn min-h-7 rounded px-3 text-slate-600">Entraînement</button>
+            <button id="tabTest" type="button" data-view="test" class="tab-btn min-h-7 rounded px-3 text-slate-600">Test des modèles</button>
+          </nav>
+          <span id="runStatus" class="inline-flex min-h-7 items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-extrabold uppercase text-slate-500">initialisation</span>
+          <button id="refreshBtn" type="button" title="Rafraîchir" class="inline-flex min-h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 hover:bg-slate-50">
+            <span aria-hidden="true">↻</span><span>Rafraîchir</span>
+          </button>
+          <a href="http://localhost:5000" target="_blank" rel="noreferrer" title="Ouvrir MLflow" class="inline-flex min-h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-transparent px-2.5 text-xs font-bold text-slate-800 hover:bg-slate-50">
+            <span aria-hidden="true">↗</span><span>MLflow</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main id="view-train" class="mx-auto grid max-w-[1280px] grid-cols-1 gap-3 px-4 py-3 pb-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <!-- Sidebar -->
+      <aside class="space-y-3">
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Lancement</h2>
+          </div>
+          <form id="trainForm" class="grid grid-cols-2 gap-x-2.5 gap-y-2">
+            <label class="col-span-2 grid gap-1 text-[11px] font-semibold text-slate-500">
+              Dataset
+              <select name="data_dir" id="dataDir" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Backbone
+              <select name="backbone" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="densenet121">DenseNet121</option>
+                <option value="resnet50">ResNet50</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Epochs
+              <input name="max_epochs" type="number" min="1" max="200" value="30" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Batch
+              <input name="batch_size" type="number" min="1" max="512" value="128" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Learning rate
+              <input name="learning_rate" type="number" step="0.00001" min="0" value="0.0001" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Workers
+              <input name="num_workers" type="number" min="0" max="32" value="8" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Precision
+              <select name="precision" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                <option value="16-mixed">16-mixed</option>
+                <option value="32-true">32-true</option>
+              </select>
+            </label>
+            <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+              Log steps
+              <input name="log_every_n_steps" type="number" min="1" max="100" value="10" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+            </label>
+            <label class="col-span-2 flex items-center gap-2 text-xs font-semibold text-slate-800">
+              <input name="pretrained" type="checkbox" checked class="h-4 w-4" />
+              <span>ImageNet pretrained</span>
+            </label>
+          </form>
+          <div class="mt-2.5 flex gap-2">
+            <button id="startBtn" type="button" class="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-blue-600 bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+              <span aria-hidden="true">▶</span><span>Démarrer</span>
+            </button>
+            <button id="stopBtn" type="button" disabled class="inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50">
+              <span aria-hidden="true">■</span><span>Arrêter</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Dataset</h2>
+          </div>
+          <div id="datasetSummary" class="grid gap-0.5"></div>
+          <div id="sampleGrid" class="mt-2.5 grid grid-cols-4 gap-1.5"></div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Système</h2>
+          </div>
+          <div id="systemInfo" class="grid gap-0.5"></div>
+        </section>
+      </aside>
+
+      <!-- Workspace -->
+      <section class="space-y-3">
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Progression</h2>
+            <span id="runDir" class="truncate text-[11px] text-slate-500"></span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <div class="mb-1.5 flex justify-between gap-2 text-xs text-slate-500">
+                <span>Epoch</span><strong id="epochLabel" class="text-slate-900">0 / 0</strong>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-slate-200">
+                <span id="epochBar" class="block h-full w-0 rounded-full bg-blue-600 transition-[width] duration-200"></span>
+              </div>
+            </div>
+            <div>
+              <div class="mb-1.5 flex justify-between gap-2 text-xs text-slate-500">
+                <span>Batch</span><strong id="batchLabel" class="text-slate-900">0 / 0</strong>
+              </div>
+              <div class="h-2 overflow-hidden rounded-full bg-slate-200">
+                <span id="batchBar" class="block h-full w-0 rounded-full bg-blue-600 transition-[width] duration-200"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Performance</h2>
+            <span class="text-[11px] text-slate-500">débit &amp; ressources</span>
+          </div>
+          <div class="grid grid-cols-4 gap-2 md:grid-cols-8">
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Débit (img/s)</span>
+              <strong id="perfImgS" class="mt-1 block text-[17px] tabular-nums text-blue-600">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Moy. (img/s)</span>
+              <strong id="perfImgSAvg" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">ms / batch</span>
+              <strong id="perfMsBatch" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">it / s</span>
+              <strong id="perfStepsS" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">VRAM</span>
+              <strong id="perfVram" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">VRAM pic</span>
+              <strong id="perfVramPeak" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Écoulé</span>
+              <strong id="perfElapsed" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">ETA</span>
+              <strong id="perfEta" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Entraînement</h2>
+            <span class="text-[11px] text-slate-500"></span>
+          </div>
+          <div class="grid grid-cols-4 gap-2 md:grid-cols-8">
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Train loss</span>
+              <strong id="metricTrainLoss" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Train AUC</span>
+              <strong id="metricTrainAuc" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Val AUC</span>
+              <strong id="metricValAuc" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Sensibilité</span>
+              <strong id="metricSensitivity" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Spécificité</span>
+              <strong id="metricSpecificity" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">F1</span>
+              <strong id="metricF1" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Accuracy</span>
+              <strong id="metricAccuracy" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">LR</span>
+              <strong id="metricLr" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section id="testMetricsSection" class="hidden rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Test (final)</h2>
+            <span id="testThreshold" class="text-[11px] font-semibold text-emerald-700"></span>
+          </div>
+          <div class="grid grid-cols-3 gap-2 md:grid-cols-5">
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Test AUROC</span><strong id="testAuroc" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Sensibilité</span><strong id="testSens" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Spécificité</span><strong id="testSpec" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">F1</span><strong id="testF1" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-emerald-200 bg-white px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Accuracy</span><strong id="testAcc" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Loss</h2></div>
+            <canvas id="lossChart" class="block h-[200px] w-full"></canvas>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Métriques test (par epoch)</h2><span class="text-[11px] text-slate-500">seuil 0.5</span></div>
+            <canvas id="metricChart" class="block h-[200px] w-full"></canvas>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Artefacts</h2></div>
+            <div id="artifacts" class="grid gap-0.5"></div>
+          </div>
+          <div class="col-span-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Logs</h2></div>
+            <pre id="logs" class="m-0 h-90 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-2.5 font-mono text-[11.5px] leading-relaxed text-emerald-100"></pre>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <!-- ===================== Test des modèles ===================== -->
+    <main id="view-test" class="mx-auto hidden max-w-[1280px] grid-cols-1 gap-3 px-4 py-3 pb-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <!-- Controls -->
+      <aside class="space-y-3">
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Modèle</h2>
+            <button id="reloadModelsBtn" type="button" title="Recharger la liste" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50">↻</button>
+          </div>
+          <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+            Checkpoint
+            <select id="modelSelect" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></select>
+          </label>
+          <div class="mt-3 grid gap-1 text-[11px] font-semibold text-slate-500">
+            <div class="flex items-center justify-between">
+              <span>Seuil de décision</span>
+              <strong id="thresholdValue" class="tabular-nums text-slate-900">0.50</strong>
+            </div>
+            <input id="thresholdSlider" type="range" min="0" max="1" step="0.01" value="0.5" class="w-full" />
+            <p class="text-[10px] font-normal text-slate-400">≥ seuil ⇒ PNEUMONIA. Plus haut ⇒ plus spécifique, moins sensible.</p>
+          </div>
+          <label class="mt-3 grid gap-1 text-[11px] font-semibold text-slate-500">
+            Dataset
+            <select id="testDataset" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"></select>
+          </label>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <h2 class="mb-2.5 text-[13px] font-bold">Évaluation sur un split</h2>
+          <label class="grid gap-1 text-[11px] font-semibold text-slate-500">
+            Split
+            <select id="evalSplit" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+              <option value="test" selected>test</option>
+              <option value="val">val</option>
+              <option value="train">train</option>
+            </select>
+          </label>
+          <button id="evalBtn" type="button" class="mt-2.5 inline-flex min-h-8 w-full items-center justify-center gap-1.5 rounded-md border border-blue-600 bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+            <span aria-hidden="true">▶</span><span>Évaluer</span>
+          </button>
+          <p class="mt-1.5 text-[10px] text-slate-400">Charge le modèle et l'évalue sur tout le split (quelques secondes).</p>
+        </section>
+      </aside>
+
+      <!-- Results -->
+      <section class="space-y-3">
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Métriques d'évaluation</h2>
+            <span id="evalMeta" class="text-[11px] text-slate-500"></span>
+          </div>
+          <div id="evalMetrics" class="grid grid-cols-2 gap-2 md:grid-cols-5">
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">AUROC</span><strong id="evalAuroc" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Sensibilité</span><strong id="evalSens" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Spécificité</span><strong id="evalSpec" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">F1</span><strong id="evalF1" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+            <div class="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"><span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Accuracy</span><strong id="evalAcc" class="mt-1 block text-[17px] tabular-nums">-</strong></div>
+          </div>
+          <div id="evalConfusion" class="mt-2.5 grid grid-cols-2 gap-2 text-xs md:grid-cols-4"></div>
+        </section>
+
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Prédiction sur une image</h2>
+            <div class="flex items-center gap-2">
+              <select id="predSplit" class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] text-slate-800"><option value="test" selected>test</option><option value="val">val</option><option value="train">train</option></select>
+              <select id="predClass" class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] text-slate-800"></select>
+              <button id="predLoadSamples" type="button" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Charger</button>
+              <label class="cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50">
+                Upload<input id="predUpload" type="file" accept="image/*" class="hidden" />
+              </label>
+            </div>
+          </div>
+          <p class="mb-2 text-[11px] text-slate-500">Clique une image pour lancer la prédiction avec le modèle et le seuil sélectionnés.</p>
+          <div id="predGrid" class="grid grid-cols-4 gap-1.5 md:grid-cols-8"></div>
+
+          <div id="predResult" class="mt-3 hidden grid-cols-[160px_minmax(0,1fr)] gap-3">
+            <img id="predImage" alt="image testée" class="aspect-square w-full rounded-md border border-slate-200 bg-black object-cover" />
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <span id="predBadge" class="inline-flex min-h-7 items-center rounded-full border px-3 text-[11px] font-extrabold uppercase">-</span>
+                <span id="predTruth" class="text-[11px] text-slate-500"></span>
+              </div>
+              <div>
+                <div class="mb-1 flex justify-between text-[11px] text-slate-500"><span id="predProbCaption">Probabilité PNEUMONIA</span><strong id="predProbLabel" class="tabular-nums text-slate-900">-</strong></div>
+                <div class="h-3 overflow-hidden rounded-full bg-slate-200">
+                  <span id="predProbBar" class="block h-full w-0 rounded-full bg-blue-600 transition-[width] duration-200"></span>
+                </div>
+                <div id="predThresholdMark" class="mt-1 text-[10px] text-slate-400"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

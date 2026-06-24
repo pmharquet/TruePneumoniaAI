@@ -3,19 +3,35 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 
 # IDE
 .idea/
 .claude
+.vscode/
+*.iml
 
 # macOS
 .DS_Store
+Thumbs.db
 
-# Dataset (trop volumineux pour git)
-chest_Xray/
+# Datasets (trop volumineux pour git)
+dataset/
+chest_Xray*/
 
-# Outputs générés
-data/*/outputs/*.jpg
-data/dataset/*/*.jpg
-ai/outputs/*.jpg
-checkpoints/*.npz
+# artifacts
+checkpoints/
+exports/
+mlruns/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Docs build
+site/
+
+# Logs / résultats
+outputs/
+outputs/cache/
+training_results/
