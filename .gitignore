@@ -16,9 +16,7 @@ __pycache__/
 Thumbs.db
 
 # Dataset (trop volumineux pour git)
-chest_Xray/
-chest_Xray_augmented/
-chest_Xray_patient/
+chest_Xray*/
 
 # artifacts
 checkpoints/
