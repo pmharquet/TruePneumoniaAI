@@ -77,6 +77,46 @@ def _to_tensor(image: Image.Image, image_size: int):
     return transform(image=arr)["image"].float()
 
 
+def _gradcam_overlay_b64(model: Any, tensor: Any, image_size: int) -> str | None:
+    """Return a Grad-CAM heatmap as a transparent RGBA PNG (base64 data URL).
+
+    The heatmap is letterbox-aligned with the model input (square, `image_size`),
+    so the frontend can lay it over the displayed X-ray. Alpha is proportional to
+    activation, so low-importance regions stay transparent and the original shows
+    through. Returns None if anything goes wrong (Grad-CAM is best-effort).
+    """
+    import base64
+    import io
+
+    import cv2
+
+    from src.explainability.gradcam import GradCAM, get_target_layer
+
+    backbone = str(getattr(model.hparams, "backbone", "densenet121"))
+    try:
+        target_layer = get_target_layer(model, backbone)
+    except ValueError:
+        return None  # unsupported backbone — skip silently
+
+    cam_gen = GradCAM(model, target_layer)
+    try:
+        # clone(): generate() flips on requires_grad and backprops — keep the
+        # caller's tensor (reused for the probability) untouched.
+        cam = cam_gen.generate(tensor.clone())  # (h, w) in [0, 1]
+    finally:
+        cam_gen.remove()
+
+    cam = cv2.resize(cam, (image_size, image_size))
+    heat = cv2.applyColorMap(np.uint8(255 * cam), cv2.COLORMAP_JET)
+    heat = cv2.cvtColor(heat, cv2.COLOR_BGR2RGB)
+    alpha = np.uint8(np.clip(cam, 0.0, 1.0) * 255 * 0.65)
+    rgba = np.dstack([heat, alpha])
+
+    buf = io.BytesIO()
+    Image.fromarray(rgba, mode="RGBA").save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 def predict_image(
     ckpt_path: Path,
     image: Image.Image,
@@ -84,6 +124,7 @@ def predict_image(
     image_size: int | None = None,
     tta: bool = True,
     classes: tuple[str, str] = ("NORMAL", "PNEUMONIA"),
+    gradcam: bool = True,
 ) -> dict[str, Any]:
     import torch
 
@@ -100,12 +141,18 @@ def predict_image(
         prob = prob.item()
 
     thr = float(threshold) if threshold is not None else float(getattr(model, "threshold", 0.5))
-    return {
+    result = {
         "probability": prob,
         "threshold": thr,
         "prediction": positive if prob >= thr else negative,
         "classes": [negative, positive],
     }
+    if gradcam:
+        try:
+            result["gradcam"] = _gradcam_overlay_b64(model, tensor, image_size)
+        except Exception:
+            result["gradcam"] = None  # never let Grad-CAM break a prediction
+    return result
 
 
 def evaluate_split(

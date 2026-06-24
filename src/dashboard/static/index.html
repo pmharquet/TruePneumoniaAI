@@ -330,7 +330,11 @@
           <div id="predGrid" class="grid grid-cols-4 gap-1.5 md:grid-cols-8"></div>
 
           <div id="predResult" class="mt-3 hidden grid-cols-[160px_minmax(0,1fr)] gap-3">
-            <img id="predImage" alt="image testée" class="aspect-square w-full rounded-md border border-slate-200 bg-black object-cover" />
+            <div class="relative aspect-square w-full self-start">
+              <img id="predImage" alt="image testée" class="absolute inset-0 h-full w-full rounded-md border border-slate-200 bg-black object-cover" />
+              <img id="predHeatmap" alt="Grad-CAM" class="pointer-events-none absolute inset-0 h-full w-full rounded-md object-cover opacity-0 transition-opacity duration-200" />
+              <button id="predHeatToggle" type="button" class="absolute bottom-1 right-1 hidden rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm hover:bg-black/70">Grad-CAM</button>
+            </div>
             <div class="space-y-2">
               <div class="flex items-center gap-2">
                 <span id="predBadge" class="inline-flex min-h-7 items-center rounded-full border px-3 text-[11px] font-extrabold uppercase">-</span>

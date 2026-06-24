@@ -706,11 +706,35 @@ async function predictUpload(file) {
   }
 }
 
+function setHeatmap(dataUrl) {
+  const heat = $("predHeatmap");
+  const toggle = $("predHeatToggle");
+  if (dataUrl) {
+    heat.src = dataUrl;
+    toggle.classList.remove("hidden");
+    showHeatmap(true);
+  } else {
+    heat.removeAttribute("src");
+    showHeatmap(false);
+    toggle.classList.add("hidden");
+  }
+}
+
+function showHeatmap(on) {
+  const heat = $("predHeatmap");
+  const toggle = $("predHeatToggle");
+  heat.classList.toggle("opacity-0", !on);
+  heat.classList.toggle("opacity-100", on);
+  toggle.classList.toggle("ring-2", on);
+  toggle.classList.toggle("ring-white/70", on);
+}
+
 function renderPrediction(result, src, trueLabel) {
   const box = $("predResult");
   box.classList.remove("hidden");
   box.classList.add("grid");
   $("predImage").src = src;
+  setHeatmap(result.gradcam);
 
   const prob = Number(result.probability);
   // prob is P(positive class); colour red when the prediction is the positive
@@ -756,6 +780,9 @@ function bindTestPage() {
   $("predUpload").addEventListener("change", (event) => {
     const file = event.target.files?.[0];
     if (file) predictUpload(file);
+  });
+  $("predHeatToggle").addEventListener("click", () => {
+    showHeatmap($("predHeatmap").classList.contains("opacity-0"));
   });
   setView("train");
 }

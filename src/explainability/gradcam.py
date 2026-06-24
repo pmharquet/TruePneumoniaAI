@@ -19,14 +19,20 @@ class GradCAM:
         self._gradients: torch.Tensor | None = None
         self._activations: torch.Tensor | None = None
 
-        target_layer.register_forward_hook(self._save_activation)
-        target_layer.register_full_backward_hook(self._save_gradient)
+        self._fwd_handle = target_layer.register_forward_hook(self._save_activation)
+        self._bwd_handle = target_layer.register_full_backward_hook(self._save_gradient)
 
     def _save_activation(self, module, input, output):
         self._activations = output.detach()
 
     def _save_gradient(self, module, grad_input, grad_output):
         self._gradients = grad_output[0].detach()
+
+    def remove(self) -> None:
+        """Detach the forward/backward hooks. Call when done to avoid leaking
+        hooks across repeated Grad-CAM calls (e.g. in a long-running server)."""
+        self._fwd_handle.remove()
+        self._bwd_handle.remove()
 
     def generate(self, img_tensor: torch.Tensor) -> np.ndarray:
         """
