@@ -20,10 +20,10 @@ jupyter nbconvert --to pdf notebooks/01_data_analysis.ipynb
 
 ## Structure du dataset
 
-Le dataset `chest_Xray/` est organisé en trois splits avec deux classes :
+Tous les datasets vivent sous `dataset/`. Le dataset brut `dataset/chest_Xray/` est organisé en trois splits avec deux classes :
 
 ```
-chest_Xray/
+dataset/chest_Xray/
 ├── train/
 │   ├── NORMAL/      ~1341 images
 │   └── PNEUMONIA/   ~3875 images
@@ -69,13 +69,16 @@ Uniquement `LongestMaxSize` + `PadIfNeeded` + `Normalize` — pas d'augmentation
 
 ### Génération offline du dataset augmenté
 
-Le script `src.data.generate_augmentations` permet de créer un dataset séparé, sans modifier `chest_Xray/` :
+Le script `src.data.generate_augmentations` permet de créer un dataset séparé, sans modifier `dataset/chest_Xray/` :
 
 ```bash
+# Tâche binaire (NORMAL vs PNEUMONIA)
 python -m src.data.generate_augmentations
+# Tâche sous-type (BACTERIA vs VIRUS, à partir des images PNEUMONIA)
+python -m src.data.generate_augmentations --task subtype --patient-split
 ```
 
-Par défaut, il écrit dans `chest_Xray_augmented/`, convertit toutes les images en 224×224 par letterbox avec padding noir, garde `val/` et `test/` sans augmentation, et équilibre `train/` en générant des variantes uniquement pour la classe minoritaire `NORMAL`.
+Par défaut, il écrit dans `dataset/chest_Xray_augmented/` (ou `dataset/chest_Xray_subtype/` pour `--task subtype`), convertit les images par letterbox avec padding noir, garde `val/` et `test/` sans augmentation, et équilibre `train/` en générant des variantes uniquement pour la classe minoritaire.
 
 ---
 

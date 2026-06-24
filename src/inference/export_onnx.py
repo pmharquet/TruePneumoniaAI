@@ -2,7 +2,7 @@
 Export the trained Lightning model to ONNX for fast inference.
 
 Usage:
-    python -m src.inference.export_onnx --ckpt checkpoints/best.ckpt --output exports/model.onnx
+    python -m src.inference.export_onnx --ckpt checkpoints/normal-pneumonia/<timestamp>/best-loss-epochXX.ckpt --output exports/model.onnx
 """
 
 import argparse

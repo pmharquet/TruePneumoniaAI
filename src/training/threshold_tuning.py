@@ -8,7 +8,7 @@ Clinical rationale: missing a pneumonia (false negative) is more dangerous than
 a false alarm, so we fix sensitivity >= target and maximize specificity.
 
 Usage:
-    python -m src.training.threshold_tuning --ckpt checkpoints/best.ckpt --config configs/default.yaml
+    python -m src.training.threshold_tuning --ckpt checkpoints/normal-pneumonia/<timestamp>/best-loss-epochXX.ckpt --config configs/default.yaml
 """
 
 import argparse

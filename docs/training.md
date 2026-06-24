@@ -8,10 +8,10 @@ Tous les hyperparamètres sont dans `configs/default.yaml` :
 
 ```yaml
 data:
-  data_dir: "chest_Xray"
-  image_size: 224
-  batch_size: 32
-  num_workers: 4
+  data_dir: "dataset/chest_Xray_augmented"
+  image_size: 128
+  batch_size: 128
+  num_workers: 8
 
 model:
   backbone: "densenet121"   # densenet121 | resnet50
@@ -41,7 +41,7 @@ uvicorn src.dashboard.app:app --host 127.0.0.1 --port 8501
 
 Puis ouvrir [http://127.0.0.1:8501](http://127.0.0.1:8501).
 
-Le dashboard permet de choisir `chest_Xray_augmented/`, les hyperparamètres, puis de suivre l'entraînement en temps réel : progression epoch/batch, loss, AUC, sensibilité, spécificité, logs et checkpoints.
+Le dashboard permet de choisir le dataset (`dataset/chest_Xray_augmented/`, `dataset/chest_Xray_subtype/`, …), les hyperparamètres, puis de suivre l'entraînement en temps réel : progression epoch/batch, loss, AUC, sensibilité, spécificité, logs et checkpoints. Le dataset sélectionné détermine la tâche (binaire NORMAL/PNEUMONIA ou sous-type BACTERIA/VIRUS) et donc la config, les classes et le dossier de checkpoints.
 
 ---
 
@@ -61,8 +61,10 @@ Ce script :
     - **Scheduler** : CosineAnnealingLR sur `max_epochs`
     - **Loss** : BCEWithLogitsLoss avec `pos_weight`
     - **Précision** : 16-mixed (AMP pour GPU)
-5. Sauvegarde les checkpoints dans `checkpoints/`
+5. Sauvegarde chaque run dans `checkpoints/<tâche>/<timestamp>/` (`.ckpt` + `config.yaml` + `events.jsonl` + `state.json`)
 6. Log chaque run dans MLflow
+
+> Pour entraîner l'étage 2 (bactérien vs viral) : `python -m src.training.train --config configs/subtype.yaml`.
 
 ---
 
@@ -121,7 +123,7 @@ Après l'entraînement, le seuil par défaut (0.5) n'est pas optimisé cliniquem
 
 ```bash
 python -m src.training.threshold_tuning \
-    --ckpt checkpoints/best-epoch=XX-val_auroc=X.XXXX.ckpt \
+    --ckpt checkpoints/normal-pneumonia/<timestamp>/best-loss-epochXX.ckpt \
     --config configs/default.yaml
 ```
 

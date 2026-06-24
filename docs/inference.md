@@ -8,7 +8,7 @@ Avant de lancer l'API, exporter le checkpoint entraîné en ONNX pour des infér
 
 ```bash
 python -m src.inference.export_onnx \
-    --ckpt checkpoints/best-epoch=XX-val_auroc=X.XXXX.ckpt \
+    --ckpt checkpoints/normal-pneumonia/<timestamp>/best-loss-epochXX.ckpt \
     --output exports/model.onnx
 ```
 

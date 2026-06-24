@@ -24,7 +24,7 @@ from .transforms import (
 class ChestXrayDataModule(pl.LightningDataModule):
     def __init__(
         self,
-        data_dir: str = "chest_Xray",
+        data_dir: str = "dataset/chest_Xray",
         image_size: int = 224,
         batch_size: int = 32,
         num_workers: int = 4,

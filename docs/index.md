@@ -8,7 +8,7 @@ Classification binaire **NORMAL vs PNEUMONIA** sur radiographies thoraciques, av
 
 | Composant           | Technologie           | Rôle                                                 |
 |---------------------|-----------------------|------------------------------------------------------|
-| Données             | `chest_Xray/`         | Images JPEG, splits train/val/test                   |
+| Données             | `dataset/chest_Xray*/` | Images JPEG, splits train/val/test                  |
 | Transforms médicaux | MONAI                 | ScaleIntensity, EnsureChannelFirst, support DICOM    |
 | Augmentation        | Albumentations        | Flip, rotation, CLAHE, bruit gaussien                |
 | Backbone            | DenseNet121 (CheXNet) | Référence historique classification radio thoracique |
@@ -24,12 +24,15 @@ Classification binaire **NORMAL vs PNEUMONIA** sur radiographies thoraciques, av
 ## Structure du projet
 
 ```
-chest_Xray/
-├── train/NORMAL/          # ~1341 images
-├── train/PNEUMONIA/       # ~3875 images
-├── val/NORMAL/
-├── val/PNEUMONIA/
-└── test/NORMAL|PNEUMONIA/
+dataset/                   # tous les datasets
+├── chest_Xray/            # brut (train/val/test × NORMAL|PNEUMONIA)
+├── chest_Xray_augmented/  # binaire augmenté/letterboxé
+├── chest_Xray_patient/    # re-split patient-level sans fuite
+└── chest_Xray_subtype/    # BACTERIA|VIRUS (étage 2)
+
+checkpoints/               # runs groupés par tâche
+├── normal-pneumonia/<timestamp>/   # *.ckpt + config + events + state
+└── bacteria-virus/<timestamp>/
 
 src/
 ├── data/
