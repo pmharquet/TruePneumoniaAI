@@ -174,38 +174,44 @@
           </div>
         </section>
 
-        <section class="grid grid-cols-4 gap-2 md:grid-cols-8">
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Train loss</span>
-            <strong id="metricTrainLoss" class="mt-1 block text-[17px] tabular-nums">-</strong>
+        <section class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="mb-2.5 flex items-center justify-between gap-3">
+            <h2 class="text-[13px] font-bold">Entraînement</h2>
+            <span class="text-[11px] text-slate-500"></span>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Train AUC</span>
-            <strong id="metricTrainAuc" class="mt-1 block text-[17px] tabular-nums">-</strong>
-          </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Val AUC</span>
-            <strong id="metricValAuc" class="mt-1 block text-[17px] tabular-nums">-</strong>
-          </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Sensibilité</span>
-            <strong id="metricSensitivity" class="mt-1 block text-[17px] tabular-nums">-</strong>
-          </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Spécificité</span>
-            <strong id="metricSpecificity" class="mt-1 block text-[17px] tabular-nums">-</strong>
-          </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">F1</span>
-            <strong id="metricF1" class="mt-1 block text-[17px] tabular-nums">-</strong>
-          </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Accuracy</span>
-            <strong id="metricAccuracy" class="mt-1 block text-[17px] tabular-nums">-</strong>
-          </div>
-          <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
-            <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">LR</span>
-            <strong id="metricLr" class="mt-1 block text-[17px] tabular-nums">-</strong>
+          <div class="grid grid-cols-4 gap-2 md:grid-cols-8">
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Train loss</span>
+              <strong id="metricTrainLoss" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Train AUC</span>
+              <strong id="metricTrainAuc" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Val AUC</span>
+              <strong id="metricValAuc" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Sensibilité</span>
+              <strong id="metricSensitivity" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Spécificité</span>
+              <strong id="metricSpecificity" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">F1</span>
+              <strong id="metricF1" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">Accuracy</span>
+              <strong id="metricAccuracy" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 shadow-sm">
+              <span class="block truncate text-[10px] font-bold uppercase tracking-wide text-slate-500">LR</span>
+              <strong id="metricLr" class="mt-1 block text-[17px] tabular-nums">-</strong>
+            </div>
           </div>
         </section>
 
@@ -234,14 +240,14 @@
           </div>
         </section>
 
-        <section class="grid grid-cols-1 gap-3 md:grid-cols-[0.8fr_1.2fr]">
+        <section class="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Artefacts</h2></div>
             <div id="artifacts" class="grid gap-0.5"></div>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div class="col-span-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <div class="mb-2.5 flex items-center justify-between gap-3"><h2 class="text-[13px] font-bold">Logs</h2></div>
-            <pre id="logs" class="m-0 min-h-[200px] max-h-[400px] overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-2.5 font-mono text-[11.5px] leading-relaxed text-emerald-100"></pre>
+            <pre id="logs" class="m-0 h-90 overflow-auto whitespace-pre-wrap rounded-md border border-slate-700 bg-slate-900 p-2.5 font-mono text-[11.5px] leading-relaxed text-emerald-100"></pre>
           </div>
         </section>
       </section>
