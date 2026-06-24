@@ -319,7 +319,7 @@
             <h2 class="text-[13px] font-bold">Prédiction sur une image</h2>
             <div class="flex items-center gap-2">
               <select id="predSplit" class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] text-slate-800"><option value="test" selected>test</option><option value="val">val</option><option value="train">train</option></select>
-              <select id="predClass" class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] text-slate-800"><option value="NORMAL" selected>NORMAL</option><option value="PNEUMONIA">PNEUMONIA</option></select>
+              <select id="predClass" class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] text-slate-800"></select>
               <button id="predLoadSamples" type="button" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Charger</button>
               <label class="cursor-pointer rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50">
                 Upload<input id="predUpload" type="file" accept="image/*" class="hidden" />
@@ -337,7 +337,7 @@
                 <span id="predTruth" class="text-[11px] text-slate-500"></span>
               </div>
               <div>
-                <div class="mb-1 flex justify-between text-[11px] text-slate-500"><span>Probabilité PNEUMONIA</span><strong id="predProbLabel" class="tabular-nums text-slate-900">-</strong></div>
+                <div class="mb-1 flex justify-between text-[11px] text-slate-500"><span id="predProbCaption">Probabilité PNEUMONIA</span><strong id="predProbLabel" class="tabular-nums text-slate-900">-</strong></div>
                 <div class="h-3 overflow-hidden rounded-full bg-slate-200">
                   <span id="predProbBar" class="block h-full w-0 rounded-full bg-blue-600 transition-[width] duration-200"></span>
                 </div>

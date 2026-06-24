@@ -7,6 +7,15 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
+// Classes a dataset holds, as [negative, positive]. The backend declares them
+// per dataset (NORMAL/PNEUMONIA for the binary task, VIRUS/BACTERIA for the
+// pneumonia-subtype task). Falls back to the binary pair if unknown.
+function datasetClasses(name) {
+  const datasets = state.project?.datasets || [];
+  const match = datasets.find((d) => d.name === name);
+  return match?.classes?.length === 2 ? match.classes : ["NORMAL", "PNEUMONIA"];
+}
+
 function fmt(value, digits = 4) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
   const number = Number(value);
@@ -77,12 +86,16 @@ function renderDatasets() {
   target.innerHTML = "";
   for (const dataset of state.project.datasets) {
     const train = dataset.counts.train || {};
+    const classes = dataset.classes?.length === 2 ? dataset.classes : ["NORMAL", "PNEUMONIA"];
+    const summary = classes
+      .map((c) => `${c[0]}=${train[c] || 0}`)
+      .join(" ");
     const row = document.createElement("div");
     row.className = ROW;
     row.innerHTML = `
       <div class="min-w-0">
         <strong>${dataset.name}</strong>
-        <div class="truncate text-[11px] text-slate-500">train N=${train.NORMAL || 0} P=${train.PNEUMONIA || 0}</div>
+        <div class="truncate text-[11px] text-slate-500">train ${summary}</div>
       </div>
       <strong>${dataset.total}</strong>
     `;
@@ -146,7 +159,8 @@ function renderArtifacts(artifacts) {
 
 async function loadSamples() {
   const dataset = $("dataDir").value || "chest_Xray_augmented";
-  const data = await getJson(`/api/dataset/sample?dataset=${encodeURIComponent(dataset)}&split=train&class_name=NORMAL&limit=4`);
+  const className = datasetClasses(dataset)[0];
+  const data = await getJson(`/api/dataset/sample?dataset=${encodeURIComponent(dataset)}&split=train&class_name=${className}&limit=4`);
   const target = $("sampleGrid");
   target.innerHTML = "";
   for (const image of data.images) {
@@ -489,8 +503,26 @@ function setView(view) {
 async function initTestPage() {
   state.testLoaded = true;
   await populateTestDatasets();
+  updatePredClasses();
   await loadModels();
   await loadPredSamples();
+}
+
+// Fill the "true class" picker with the selected dataset's classes so the
+// subtype dataset offers BACTERIA/VIRUS instead of NORMAL/PNEUMONIA.
+function updatePredClasses() {
+  const select = $("predClass");
+  if (!select) return;
+  const previous = select.value;
+  const classes = datasetClasses($("testDataset").value);
+  select.innerHTML = "";
+  for (const name of classes) {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    select.appendChild(option);
+  }
+  if (classes.includes(previous)) select.value = previous;
 }
 
 async function populateTestDatasets() {
@@ -573,7 +605,10 @@ async function runEvaluate() {
     $("evalSpec").textContent = fmt(m.specificity, 3);
     $("evalF1").textContent = fmt(m.f1, 3);
     $("evalAcc").textContent = fmt(m.accuracy, 3);
-    $("evalMeta").textContent = `${result.count} images · N=${result.n_normal} P=${result.n_pneumonia} · seuil ${result.threshold.toFixed(2)}`;
+    const cls = result.classes || ["NORMAL", "PNEUMONIA"];
+    const nNeg = result.n_negative ?? result.n_normal;
+    const nPos = result.n_positive ?? result.n_pneumonia;
+    $("evalMeta").textContent = `${result.count} images · ${cls[0]}=${nNeg} ${cls[1]}=${nPos} · seuil ${result.threshold.toFixed(2)}`;
     const c = result.confusion;
     const cells = [
       ["Vrais positifs", c.tp, "text-green-700"],
@@ -677,10 +712,13 @@ function renderPrediction(result, src, trueLabel) {
   $("predImage").src = src;
 
   const prob = Number(result.probability);
-  const isPneumonia = result.prediction === "PNEUMONIA";
+  // prob is P(positive class); colour red when the prediction is the positive
+  // (clinically flagged) class — PNEUMONIA or, for the subtype model, BACTERIA.
+  const positive = result.classes ? result.classes[1] : "PNEUMONIA";
+  const isPositive = result.prediction === positive;
   const badge = $("predBadge");
   badge.textContent = result.prediction;
-  badge.className = `inline-flex min-h-7 items-center rounded-full border px-3 text-[11px] font-extrabold uppercase ${isPneumonia ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700"}`;
+  badge.className = `inline-flex min-h-7 items-center rounded-full border px-3 text-[11px] font-extrabold uppercase ${isPositive ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700"}`;
 
   const truth = $("predTruth");
   if (trueLabel) {
@@ -692,9 +730,11 @@ function renderPrediction(result, src, trueLabel) {
     truth.className = "text-[11px] text-slate-500";
   }
 
+  const probCaption = $("predProbCaption");
+  if (probCaption) probCaption.textContent = `Probabilité ${positive}`;
   $("predProbLabel").textContent = `${(prob * 100).toFixed(1)} %`;
   $("predProbBar").style.width = `${Math.min(100, prob * 100)}%`;
-  $("predProbBar").className = `block h-full rounded-full transition-[width] duration-200 ${isPneumonia ? "bg-red-500" : "bg-green-500"}`;
+  $("predProbBar").className = `block h-full rounded-full transition-[width] duration-200 ${isPositive ? "bg-red-500" : "bg-green-500"}`;
   $("predThresholdMark").textContent = `seuil de décision = ${Number(result.threshold).toFixed(2)}`;
 }
 
@@ -708,7 +748,10 @@ function bindTestPage() {
   $("reloadModelsBtn").addEventListener("click", loadModels);
   $("evalBtn").addEventListener("click", runEvaluate);
   $("predLoadSamples").addEventListener("click", loadPredSamples);
-  $("testDataset").addEventListener("change", loadPredSamples);
+  $("testDataset").addEventListener("change", () => {
+    updatePredClasses();
+    loadPredSamples();
+  });
   $("predUpload").addEventListener("change", (event) => {
     const file = event.target.files?.[0];
     if (file) predictUpload(file);

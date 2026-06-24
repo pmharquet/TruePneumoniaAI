@@ -1,0 +1,48 @@
+# Stage-2 model: among PNEUMONIA cases, distinguish BACTERIAL vs VIRAL.
+# Same architecture/pipeline as the binary model — only the class layout differs.
+data:
+  data_dir: "chest_Xray_subtype" # leak-free patient-level re-split of PNEUMONIA images
+  image_size: 128
+  num_workers: 8
+  prefetch_factor: 4
+  batch_size: 128
+  # Generated val/ is already a patient-disjoint split — use it directly.
+  val_split: 0.0
+  clahe: true
+  # Order sets the label index: VIRUS=0 (negative), BACTERIA=1 (positive).
+  # Bacterial is positive so threshold tuning protects its sensitivity — missing
+  # a treatable bacterial pneumonia (needs antibiotics) is the costlier error.
+  classes: ["VIRUS", "BACTERIA"]
+
+model:
+  backbone: "densenet121" # densenet121 | resnet50
+  pretrained: true
+  num_classes: 1 # binary: VIRUS vs BACTERIA
+  dropout: 0.5
+
+training:
+  max_epochs: 30
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  label_smoothing: 0.05
+  freeze_backbone: true
+  precision: "16-mixed"
+  deterministic: false
+  compile: false
+  seed: 42
+
+threshold:
+  default: 0.5
+  target_sensitivity: 0.95 # sensitivity for BACTERIA (the positive class)
+
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "TruePneumoniaAI-subtype"
+
+paths:
+  checkpoints: "checkpoints_subtype"
+  onnx_export: "exports/model_subtype.onnx"
+  gradcam_output: "outputs/gradcam_subtype"
+
+dashboard:
+  log_every_n_steps: 10

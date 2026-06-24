@@ -35,9 +35,65 @@ RUNS_DIR = DASHBOARD_ROOT / "runs"
 LATEST_RUN_FILE = DASHBOARD_ROOT / "latest_run.txt"
 DEFAULT_CONFIG = ROOT / "configs" / "default.yaml"
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
-DATASETS = ("chest_Xray_patient", "chest_Xray_augmented", "chest_Xray")
 CLASSES = ("NORMAL", "PNEUMONIA")
 SPLITS = ("train", "val", "test")
+
+# Each dataset declares its classification task: which config trains it and
+# which two classes it holds. Class order is (negative=idx0, positive=idx1) —
+# it must match the training config's `data.classes` so the model's single
+# logit (= P(positive)) is interpreted with the right label. Datasets not
+# listed here fall back to the binary NORMAL/PNEUMONIA task on DEFAULT_CONFIG.
+DATASET_CONFIG = {
+    "chest_Xray_subtype": ROOT / "configs" / "subtype.yaml",
+}
+DATASET_CLASSES = {
+    "chest_Xray_subtype": ("VIRUS", "BACTERIA"),
+}
+DATASETS = (
+    "chest_Xray_patient",
+    "chest_Xray_augmented",
+    "chest_Xray",
+    "chest_Xray_subtype",
+)
+
+
+def _classes_for(dataset_name: str) -> tuple[str, ...]:
+    return DATASET_CLASSES.get(dataset_name, CLASSES)
+
+
+def _config_for(dataset_name: str) -> Path:
+    return DATASET_CONFIG.get(dataset_name, DEFAULT_CONFIG)
+
+
+def _classes_for_checkpoint(ckpt_path: Path) -> tuple[str, ...]:
+    """Infer a model's task classes from which task's checkpoint dir it lives
+    in — used for uploaded images where no dataset is selected."""
+    resolved = ckpt_path.resolve()
+    for dataset_name, cfg_path in DATASET_CONFIG.items():
+        try:
+            ckpt_dir = _safe_relative_path(
+                Path(_load_yaml(cfg_path)["paths"]["checkpoints"])
+            ).resolve()
+        except Exception:
+            continue
+        if ckpt_dir in (resolved, *resolved.parents):
+            return _classes_for(dataset_name)
+    return CLASSES
+
+
+def _task_checkpoint_dirs() -> list[Path]:
+    """Checkpoint directories across every known task config (binary + subtype),
+    so the test page can list models from all of them."""
+    dirs: list[Path] = []
+    for cfg_path in (DEFAULT_CONFIG, *DATASET_CONFIG.values()):
+        try:
+            ckpt = _safe_relative_path(Path(_load_yaml(cfg_path)["paths"]["checkpoints"]))
+        except Exception:
+            continue
+        if ckpt not in dirs:
+            dirs.append(ckpt)
+    return dirs
+
 PRETRAINED_WEIGHTS = {
     "densenet121": "densenet121-a639ec97.pth",
     "resnet50": "resnet50-11ad3fa6.pth",
@@ -104,11 +160,12 @@ def _safe_relative_path(path: Path) -> Path:
 
 
 def _dataset_counts(dataset: Path) -> dict[str, Any]:
+    classes = _classes_for(dataset.name)
     counts: dict[str, dict[str, int]] = {}
     total = 0
     for split in SPLITS:
         counts[split] = {}
-        for class_name in CLASSES:
+        for class_name in classes:
             class_dir = dataset / split / class_name
             count = 0
             if class_dir.exists():
@@ -132,6 +189,7 @@ def _dataset_counts(dataset: Path) -> dict[str, Any]:
         "path": str(dataset.relative_to(ROOT)) if ROOT in (dataset, *dataset.parents) else str(dataset),
         "exists": dataset.exists(),
         "total": total,
+        "classes": list(classes),
         "counts": counts,
         "summary": summary,
     }
@@ -204,13 +262,7 @@ def _tail_file(path: Path, lines: int = 120) -> list[str]:
     return text[-lines:]
 
 
-def _artifact_snapshot(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
-    cfg = cfg or _load_yaml(DEFAULT_CONFIG)
-    ckpt_dir = _safe_relative_path(Path(cfg["paths"]["checkpoints"]))
-    export_path = _safe_relative_path(Path(cfg["paths"]["onnx_export"]))
-    mlruns = _safe_relative_path(Path(cfg["mlflow"]["tracking_uri"]))
-    torch_cache = ROOT / "outputs" / "cache" / "torch" / "hub" / "checkpoints"
-
+def _checkpoints_in(ckpt_dir: Path) -> list[dict[str, Any]]:
     # rglob, not glob: checkpoint filenames embed "val/loss" etc., so Lightning
     # nests the .ckpt inside a "val" subdirectory.
     checkpoints = []
@@ -222,6 +274,29 @@ def _artifact_snapshot(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
                 "size_mb": round(path.stat().st_size / 1024 / 1024, 2),
                 "modified": path.stat().st_mtime,
             })
+    return checkpoints
+
+
+def _all_checkpoints() -> list[dict[str, Any]]:
+    """Checkpoints from every task's directory, newest first. The dir name is
+    prefixed onto the display name so binary and subtype models are tellable
+    apart in the picker."""
+    seen: dict[str, dict[str, Any]] = {}
+    for ckpt_dir in _task_checkpoint_dirs():
+        for ckpt in _checkpoints_in(ckpt_dir):
+            ckpt = {**ckpt, "name": f"{ckpt_dir.name}/{ckpt['name']}"}
+            seen[ckpt["path"]] = ckpt
+    return sorted(seen.values(), key=lambda c: c["modified"], reverse=True)
+
+
+def _artifact_snapshot(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+    cfg = cfg or _load_yaml(DEFAULT_CONFIG)
+    ckpt_dir = _safe_relative_path(Path(cfg["paths"]["checkpoints"]))
+    export_path = _safe_relative_path(Path(cfg["paths"]["onnx_export"]))
+    mlruns = _safe_relative_path(Path(cfg["mlflow"]["tracking_uri"]))
+    torch_cache = ROOT / "outputs" / "cache" / "torch" / "hub" / "checkpoints"
+
+    checkpoints = _checkpoints_in(ckpt_dir)
 
     return {
         "checkpoints": checkpoints,
@@ -372,7 +447,10 @@ async def start_training(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="Training is already running.")
 
     overrides = await request.json()
-    base_cfg = _load_yaml(DEFAULT_CONFIG)
+    # Pick the task config from the selected dataset so the subtype dataset
+    # trains with its own classes / checkpoints / experiment, not the binary one.
+    dataset_name = overrides.get("data_dir") or _default_data_dir()
+    base_cfg = _load_yaml(_config_for(dataset_name))
     cfg = _apply_overrides(base_cfg, overrides)
     data_dir = _safe_relative_path(Path(cfg["data"]["data_dir"]))
     if not data_dir.exists():
@@ -482,10 +560,10 @@ def dataset_sample(
 def _resolve_checkpoint(checkpoint: str) -> Path:
     if not checkpoint:
         raise HTTPException(status_code=400, detail="No checkpoint provided.")
-    ckpt_dir = _safe_relative_path(Path(_load_yaml(DEFAULT_CONFIG)["paths"]["checkpoints"]))
     path = _safe_relative_path(Path(checkpoint))
-    if ckpt_dir.resolve() not in (path, *path.parents):
-        raise HTTPException(status_code=400, detail="Checkpoint outside checkpoints directory.")
+    allowed = [d.resolve() for d in _task_checkpoint_dirs()]
+    if not any(d in (path, *path.parents) for d in allowed):
+        raise HTTPException(status_code=400, detail="Checkpoint outside checkpoints directories.")
     if not path.exists() or path.suffix != ".ckpt":
         raise HTTPException(status_code=404, detail=f"Checkpoint not found: {checkpoint}")
     return path
@@ -505,7 +583,7 @@ def _parse_threshold(value: Any) -> float | None:
 
 @app.get("/api/models")
 def list_models() -> dict[str, Any]:
-    return {"checkpoints": _artifact_snapshot()["checkpoints"]}
+    return {"checkpoints": _all_checkpoints()}
 
 
 @app.post("/api/evaluate")
@@ -520,8 +598,11 @@ async def evaluate_model(request: Request) -> dict[str, Any]:
     if split not in SPLITS:
         raise HTTPException(status_code=400, detail=f"Invalid split: {split}")
     threshold = _parse_threshold(body.get("threshold"))
+    classes = _classes_for(Path(dataset).name)
     try:
-        return inference.evaluate_split(ckpt, dataset, split=split, threshold=threshold)
+        return inference.evaluate_split(
+            ckpt, dataset, split=split, threshold=threshold, classes=classes
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -534,17 +615,20 @@ async def predict_dataset_image(request: Request) -> dict[str, Any]:
     ckpt = _resolve_checkpoint(body.get("checkpoint", ""))
     dataset = body.get("dataset") or _default_data_dir()
     split = body.get("split") or "test"
-    class_name = body.get("class_name") or "NORMAL"
+    classes = _classes_for(Path(dataset).name)
+    class_name = body.get("class_name") or classes[0]
     name = body.get("name") or ""
     threshold = _parse_threshold(body.get("threshold"))
-    if class_name not in CLASSES or split not in SPLITS:
+    if class_name not in classes or split not in SPLITS:
         raise HTTPException(status_code=400, detail="Invalid split or class.")
 
     image_path = _safe_relative_path(Path(dataset) / split / class_name / name)
     if not image_path.exists() or image_path.suffix.lower() not in IMAGE_EXTS:
         raise HTTPException(status_code=404, detail=f"Image not found: {name}")
 
-    result = inference.predict_image(ckpt, Image.open(image_path), threshold=threshold)
+    result = inference.predict_image(
+        ckpt, Image.open(image_path), threshold=threshold, classes=classes
+    )
     result["true_label"] = class_name
     result["correct"] = result["prediction"] == class_name
     return result
@@ -566,7 +650,8 @@ async def predict_uploaded_image(request: Request) -> dict[str, Any]:
         image = Image.open(io.BytesIO(raw))
     except Exception:
         raise HTTPException(status_code=400, detail="Could not read uploaded image.")
-    return inference.predict_image(ckpt, image, threshold=thr)
+    classes = _classes_for_checkpoint(ckpt)
+    return inference.predict_image(ckpt, image, threshold=thr, classes=classes)
 
 
 @app.websocket("/ws/status")

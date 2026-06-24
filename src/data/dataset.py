@@ -1,6 +1,9 @@
 """
-ChestXrayDataset — loads chest_Xray/{train,val,test}/{NORMAL,PNEUMONIA}
-Labels: 0 = NORMAL, 1 = PNEUMONIA
+ChestXrayDataset — loads <root>/{train,val,test}/{<class>,...}
+
+Default task is binary NORMAL vs PNEUMONIA (0/1). The class layout is
+configurable via `class_to_idx` so the same dataset serves the pneumonia
+subtype task too (BACTERIA vs VIRUS), which only differs in folder names.
 """
 
 from pathlib import Path
@@ -12,6 +15,7 @@ import torch
 from torch.utils.data import Dataset
 
 
+# Default binary task. Order defines the label index: NORMAL=0, PNEUMONIA=1.
 CLASS_TO_IDX = {"NORMAL": 0, "PNEUMONIA": 1}
 
 
@@ -23,10 +27,12 @@ class ChestXrayDataset(Dataset):
         transform: Optional[Callable] = None,
         use_rgb: bool = True,
         samples: Optional[list[tuple[Path, int]]] = None,
+        class_to_idx: Optional[dict[str, int]] = None,
     ):
         self.root = Path(root) / split
         self.transform = transform
         self.use_rgb = use_rgb
+        self.class_to_idx = dict(class_to_idx) if class_to_idx else dict(CLASS_TO_IDX)
         self.samples: list[tuple[Path, int]] = []
 
         # Allow constructing from an explicit (path, label) list — used by the
@@ -38,7 +44,7 @@ class ChestXrayDataset(Dataset):
                 raise ValueError("Empty samples list passed to ChestXrayDataset")
             return
 
-        for class_name, label in CLASS_TO_IDX.items():
+        for class_name, label in self.class_to_idx.items():
             class_dir = self.root / class_name
             if not class_dir.exists():
                 raise FileNotFoundError(f"Expected directory: {class_dir}")
@@ -70,8 +76,8 @@ class ChestXrayDataset(Dataset):
         return img_tensor, torch.tensor(label, dtype=torch.float32)
 
     def class_counts(self) -> dict[str, int]:
-        counts = {name: 0 for name in CLASS_TO_IDX}
-        idx_to_class = {v: k for k, v in CLASS_TO_IDX.items()}
+        counts = {name: 0 for name in self.class_to_idx}
+        idx_to_class = {v: k for k, v in self.class_to_idx.items()}
         for _, label in self.samples:
             counts[idx_to_class[label]] += 1
         return counts

@@ -32,6 +32,7 @@ class ChestXrayDataModule(pl.LightningDataModule):
         val_split: float = 0.15,
         split_seed: int = 42,
         clahe: bool = False,
+        classes: list[str] | None = None,
     ):
         super().__init__()
         self.data_dir = data_dir
@@ -42,6 +43,11 @@ class ChestXrayDataModule(pl.LightningDataModule):
         self.val_split = val_split
         self.split_seed = split_seed
         self.clahe = clahe
+        # Ordered class list defines the label index (classes[0]=0=negative,
+        # classes[1]=1=positive). Defaults to the binary NORMAL/PNEUMONIA task.
+        self.class_to_idx = (
+            {name: i for i, name in enumerate(classes)} if classes else dict(CLASS_TO_IDX)
+        )
         self.pos_weight: torch.Tensor | None = None
 
     def _loader_kwargs(self, shuffle: bool) -> dict:
@@ -80,10 +86,10 @@ class ChestXrayDataModule(pl.LightningDataModule):
                         continue
                     src = row["source_path"]
                     groups[src].append((root / row["output_path"], row["kind"]))
-                    group_label[src] = CLASS_TO_IDX[row["class"]]
+                    group_label[src] = self.class_to_idx[row["class"]]
         else:
             # No augmentation manifest: each file is its own group.
-            base = ChestXrayDataset(self.data_dir, "train")
+            base = ChestXrayDataset(self.data_dir, "train", class_to_idx=self.class_to_idx)
             for path, label in base.samples:
                 groups[str(path)].append((path, "original"))
                 group_label[str(path)] = label
@@ -129,22 +135,32 @@ class ChestXrayDataModule(pl.LightningDataModule):
         if self.val_split and self.val_split > 0:
             train_samples, val_samples = self._carve_validation_split()
             self.train_dataset = ChestXrayDataset(
-                self.data_dir, "train", transform=train_tf, samples=train_samples
+                self.data_dir, "train", transform=train_tf,
+                samples=train_samples, class_to_idx=self.class_to_idx,
             )
             self.val_dataset = ChestXrayDataset(
-                self.data_dir, "train", transform=val_tf, samples=val_samples
+                self.data_dir, "train", transform=val_tf,
+                samples=val_samples, class_to_idx=self.class_to_idx,
             )
         else:
-            self.train_dataset = ChestXrayDataset(self.data_dir, "train", transform=train_tf)
-            self.val_dataset = ChestXrayDataset(self.data_dir, "val", transform=val_tf)
+            self.train_dataset = ChestXrayDataset(
+                self.data_dir, "train", transform=train_tf, class_to_idx=self.class_to_idx
+            )
+            self.val_dataset = ChestXrayDataset(
+                self.data_dir, "val", transform=val_tf, class_to_idx=self.class_to_idx
+            )
 
-        self.test_dataset = ChestXrayDataset(self.data_dir, "test", transform=val_tf)
+        self.test_dataset = ChestXrayDataset(
+            self.data_dir, "test", transform=val_tf, class_to_idx=self.class_to_idx
+        )
 
         counts = self.train_dataset.class_counts()
-        n_normal = counts["NORMAL"]
-        n_pneumonia = counts["PNEUMONIA"]
-        # pos_weight = n_negative / n_positive — upweights PNEUMONIA in BCEWithLogitsLoss
-        self.pos_weight = torch.tensor([n_normal / n_pneumonia], dtype=torch.float32)
+        idx_to_class = {v: k for k, v in self.class_to_idx.items()}
+        n_neg = counts[idx_to_class[0]]
+        n_pos = counts[idx_to_class[1]]
+        # pos_weight = n_negative / n_positive — upweights the positive class
+        # (idx 1) in BCEWithLogitsLoss to counter class imbalance.
+        self.pos_weight = torch.tensor([n_neg / n_pos], dtype=torch.float32)
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(self.train_dataset, **self._loader_kwargs(shuffle=True))

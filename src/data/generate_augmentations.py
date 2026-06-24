@@ -22,6 +22,7 @@ import random
 import re
 import shutil
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -31,7 +32,6 @@ from PIL import Image, ImageOps
 from src.data.transforms import get_offline_resize_transform, get_offline_train_transforms
 
 
-CLASSES = ("NORMAL", "PNEUMONIA")
 SPLITS = ("train", "val", "test")
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
@@ -49,18 +49,72 @@ def list_images(class_dir: Path) -> list[Path]:
     )
 
 
-def patient_key(path: Path, split: str, class_name: str) -> str:
+def _namespaced_pid(path: Path, split: str) -> str:
     """Namespaced patient id. The `personNNN`/`IM-XXXX` numbering restarts in
     each original split, so `train:person100` and `test:person100` are DIFFERENT
-    patients — we prefix by the original split to never fuse two of them."""
-    pattern = _PNEUMONIA_RE if class_name == "PNEUMONIA" else _NORMAL_RE
-    match = pattern.match(path.name)
+    patients — we prefix by the original split to never fuse two of them. Both
+    regexes are tried because a person id only appears in PNEUMONIA and an IM id
+    only in NORMAL, so the match is unambiguous."""
+    match = _PNEUMONIA_RE.match(path.name) or _NORMAL_RE.match(path.name)
     pid = match.group(1).lower() if match else path.stem.lower()
     return f"{split}:{pid}"
 
 
+@dataclass(frozen=True)
+class LabelScheme:
+    """Maps source images to class folders for a given classification task.
+
+    `binary` reads one folder per class (NORMAL/PNEUMONIA). `subtype` reads only
+    the PNEUMONIA folder and re-labels each image BACTERIA/VIRUS from the Kermany
+    filename convention (`personNNN_bacteria_*` / `personNNN_virus_*`)."""
+
+    name: str
+    classes: tuple[str, ...]
+
+    def collect(self, input_root: Path, split: str) -> list[tuple[Path, str]]:
+        """Return (image_path, class_name) for every labeled image in `split`."""
+        out: list[tuple[Path, str]] = []
+        if self.name == "binary":
+            for class_name in self.classes:
+                class_dir = input_root / split / class_name
+                if not class_dir.exists():
+                    raise FileNotFoundError(f"Expected directory: {class_dir}")
+                out.extend((path, class_name) for path in list_images(class_dir))
+        elif self.name == "subtype":
+            class_dir = input_root / split / "PNEUMONIA"
+            if not class_dir.exists():
+                raise FileNotFoundError(f"Expected directory: {class_dir}")
+            for path in list_images(class_dir):
+                lower = path.name.lower()
+                if "bacteria" in lower:
+                    out.append((path, "BACTERIA"))
+                elif "virus" in lower:
+                    out.append((path, "VIRUS"))
+                # Images with neither marker are skipped (no usable subtype label).
+        else:
+            raise ValueError(f"Unknown label scheme: {self.name}")
+        return out
+
+    def patient_key(self, path: Path, split: str, class_name: str) -> str:
+        pid = _namespaced_pid(path, split)
+        if self.name == "subtype":
+            # Kermany reuses the `personNNN` counter across subtypes, so
+            # `person1000_bacteria` and `person1000_virus` are DIFFERENT
+            # patients. Namespacing the key by class keeps them separate —
+            # otherwise one image's label would overwrite the other's and the
+            # patient would be mis-assigned wholesale to one subtype.
+            return f"{pid}:{class_name}"
+        return pid
+
+
+SCHEMES = {
+    "binary": LabelScheme("binary", ("NORMAL", "PNEUMONIA")),
+    "subtype": LabelScheme("subtype", ("BACTERIA", "VIRUS")),
+}
+
+
 def build_patient_split(
-    input_root: Path, val_frac: float, test_frac: float, seed: int
+    input_root: Path, scheme: LabelScheme, val_frac: float, test_frac: float, seed: int
 ) -> tuple[dict[str, dict[str, list[Path]]], dict]:
     """Merge all original splits, group images by patient, and re-partition the
     PATIENTS (not images) into train/val/test, stratified by class. Returns
@@ -70,21 +124,17 @@ def build_patient_split(
     patient_paths: dict[str, list[Path]] = defaultdict(list)
     patient_class: dict[str, str] = {}
     for split in SPLITS:
-        for class_name in CLASSES:
-            class_dir = input_root / split / class_name
-            if not class_dir.exists():
-                raise FileNotFoundError(f"Expected directory: {class_dir}")
-            for path in list_images(class_dir):
-                key = patient_key(path, split, class_name)
-                patient_paths[key].append(path)
-                patient_class[key] = class_name
+        for path, class_name in scheme.collect(input_root, split):
+            key = scheme.patient_key(path, split, class_name)
+            patient_paths[key].append(path)
+            patient_class[key] = class_name
 
     by_class: dict[str, list[str]] = defaultdict(list)
     for key, class_name in patient_class.items():
         by_class[class_name].append(key)
 
     splits_data: dict[str, dict[str, list[Path]]] = {
-        s: {c: [] for c in CLASSES} for s in SPLITS
+        s: {c: [] for c in scheme.classes} for s in SPLITS
     }
     stats: dict[str, dict] = {}
     for class_name, keys in by_class.items():
@@ -188,6 +238,7 @@ def generate_dataset(
     seed: int,
     jpeg_quality: int,
     overwrite: bool,
+    scheme: LabelScheme = SCHEMES["binary"],
     patient_split: bool = False,
     val_frac: float = 0.15,
     test_frac: float = 0.15,
@@ -203,16 +254,13 @@ def generate_dataset(
     split_stats = None
     if patient_split:
         splits_data, split_stats = build_patient_split(
-            input_root, val_frac, test_frac, seed
+            input_root, scheme, val_frac, test_frac, seed
         )
     else:
-        splits_data = {
-            split: {
-                class_name: list_images(input_root / split / class_name)
-                for class_name in CLASSES
-            }
-            for split in SPLITS
-        }
+        splits_data = {s: {c: [] for c in scheme.classes} for s in SPLITS}
+        for split in SPLITS:
+            for path, class_name in scheme.collect(input_root, split):
+                splits_data[split][class_name].append(path)
 
     resize_tf = get_offline_resize_transform(image_size)
     aug_tf = get_offline_train_transforms(image_size)
@@ -237,7 +285,7 @@ def generate_dataset(
         train_sources: dict[str, list[Path]] = {}
 
         for split in SPLITS:
-            for class_name in CLASSES:
+            for class_name in scheme.classes:
                 out_dir = output_root / split / class_name
                 out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -316,6 +364,8 @@ def generate_dataset(
 
     summary = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "task": scheme.name,
+        "classes": list(scheme.classes),
         "input_root": str(input_root),
         "output_root": str(output_root),
         "image_size": image_size,
@@ -344,8 +394,20 @@ def generate_dataset(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--task",
+        choices=tuple(SCHEMES),
+        default="binary",
+        help="binary = NORMAL vs PNEUMONIA; subtype = BACTERIA vs VIRUS "
+        "(from PNEUMONIA filenames).",
+    )
     parser.add_argument("--input", default="chest_Xray", type=Path)
-    parser.add_argument("--output", default="chest_Xray_augmented", type=Path)
+    parser.add_argument(
+        "--output",
+        default=None,
+        type=Path,
+        help="Defaults to chest_Xray_augmented (binary) or chest_Xray_subtype (subtype).",
+    )
     parser.add_argument("--image-size", default=128, type=int)
     parser.add_argument("--mode", choices=("balance", "fixed"), default="balance")
     parser.add_argument("--copies-per-image", default=1, type=int)
@@ -361,15 +423,23 @@ def main() -> None:
     parser.add_argument("--test-frac", default=0.15, type=float)
     args = parser.parse_args()
 
+    scheme = SCHEMES[args.task]
+    default_output = {
+        "binary": Path("chest_Xray_augmented"),
+        "subtype": Path("chest_Xray_subtype"),
+    }[args.task]
+    output = args.output if args.output is not None else default_output
+
     summary = generate_dataset(
         input_root=args.input,
-        output_root=args.output,
+        output_root=output,
         image_size=args.image_size,
         mode=args.mode,
         copies_per_image=args.copies_per_image,
         seed=args.seed,
         jpeg_quality=args.jpeg_quality,
         overwrite=args.overwrite,
+        scheme=scheme,
         patient_split=args.patient_split,
         val_frac=args.val_frac,
         test_frac=args.test_frac,

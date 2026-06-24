@@ -171,6 +171,7 @@ def train(cfg: dict):
         prefetch_factor=cfg["data"].get("prefetch_factor", 4),
         val_split=cfg["data"].get("val_split", 0.15),
         clahe=cfg["data"].get("clahe", False),
+        classes=cfg["data"].get("classes"),
     )
     dm.setup()
 

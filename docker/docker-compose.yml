@@ -23,7 +23,9 @@ services:
       - ../chest_Xray:/app/chest_Xray
       - ../chest_Xray_augmented:/app/chest_Xray_augmented
       - ../chest_Xray_patient:/app/chest_Xray_patient
+      - ../chest_Xray_subtype:/app/chest_Xray_subtype
       - ../checkpoints:/app/checkpoints
+      - ../checkpoints_subtype:/app/checkpoints_subtype
       - ../exports:/app/exports
       - ../outputs:/app/outputs
       - ../mlruns:/app/mlruns
@@ -64,6 +66,7 @@ services:
       - "8000:8000"
     volumes:
       - ../checkpoints:/app/checkpoints:ro
+      - ../checkpoints_subtype:/app/checkpoints_subtype:ro
       - ../exports:/app/exports:ro
       - ../configs:/app/configs:ro
     environment:

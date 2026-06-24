@@ -83,9 +83,13 @@ def predict_image(
     threshold: float | None = None,
     image_size: int | None = None,
     tta: bool = True,
+    classes: tuple[str, str] = ("NORMAL", "PNEUMONIA"),
 ) -> dict[str, Any]:
     import torch
 
+    # The model emits one logit = P(positive class). `classes` names that task:
+    # index 0 = negative (prob < threshold), index 1 = positive (prob >= thr).
+    negative, positive = classes[0], classes[1]
     image_size = image_size or _config_image_size()
     model, device = _load_model(ckpt_path)
     tensor = _to_tensor(image, image_size).unsqueeze(0).to(device)
@@ -99,7 +103,8 @@ def predict_image(
     return {
         "probability": prob,
         "threshold": thr,
-        "prediction": "PNEUMONIA" if prob >= thr else "NORMAL",
+        "prediction": positive if prob >= thr else negative,
+        "classes": [negative, positive],
     }
 
 
@@ -111,6 +116,7 @@ def evaluate_split(
     image_size: int | None = None,
     batch_size: int = 64,
     tta: bool = True,
+    classes: tuple[str, str] = ("NORMAL", "PNEUMONIA"),
 ) -> dict[str, Any]:
     import torch
     from torch.utils.data import DataLoader
@@ -118,9 +124,13 @@ def evaluate_split(
 
     from src.data.dataset import ChestXrayDataset
 
+    negative, positive = classes[0], classes[1]
+    class_to_idx = {negative: 0, positive: 1}
     image_size = image_size or _config_image_size()
     model, device = _load_model(ckpt_path)
-    dataset = ChestXrayDataset(data_dir, split, transform=_val_transform(image_size))
+    dataset = ChestXrayDataset(
+        data_dir, split, transform=_val_transform(image_size), class_to_idx=class_to_idx
+    )
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     probs_all, labels_all = [], []
@@ -156,6 +166,10 @@ def evaluate_split(
         "split": split,
         "threshold": thr,
         "count": int(len(labels)),
+        "classes": [negative, positive],
+        "n_negative": n_neg,
+        "n_positive": n_pos,
+        # Back-compat aliases (n_normal=negative, n_pneumonia=positive).
         "n_normal": n_neg,
         "n_pneumonia": n_pos,
         "metrics": {
