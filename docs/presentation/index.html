@@ -430,12 +430,15 @@
         <div class="note"><b>Contrôle qualité :</b> si les zones rouges tombent sur les <b>poumons</b>, la
           décision est crédible. Si elles tombent sur une étiquette ou du matériel médical, on rejette le verdict.</div>
       </div>
-      <div class="grow center">
-        <div class="card center" style="padding:2.4rem 1.4rem">
-          <div style="font-size:3.4rem">🔥🫁</div>
-          <p style="margin-top:1rem;color:var(--mut)">Heatmap superposée à la radio<br>
-            → <b style="color:var(--ink)">l'IA devient « auditable »</b> par le médecin</p>
+      <div class="grow">
+        <div class="row" style="gap:1rem">
+          <figure style="flex:1"><img class="shot" src="assets/xray_bacteria_grad-cam_off.png" alt="radio sans heatmap">
+            <figcaption>La radio analysée</figcaption></figure>
+          <figure style="flex:1"><img class="shot" src="assets/xray_bacteria_grad-cam_on.png" alt="radio avec heatmap Grad-CAM">
+            <figcaption><b style="color:var(--bad)">🔥 Foyer détecté</b> par l'IA</figcaption></figure>
         </div>
+        <p class="small" style="text-align:center;margin-top:.8rem">Exemple réel généré par le projet — la zone chaude
+          tombe bien sur le <b style="color:var(--ink)">poumon</b> → décision <b style="color:var(--ink)">auditable</b> par le médecin.</p>
       </div>
     </div>
   </section>
