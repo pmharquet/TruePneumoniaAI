@@ -159,7 +159,7 @@ function renderArtifacts(artifacts) {
 }
 
 async function loadSamples() {
-  const dataset = $("dataDir").value || "dataset/chest_Xray_augmented";
+  const dataset = $("dataDir").value || "dataset/chest_Xray_NP_augmented";
   const className = datasetClasses(dataset)[0];
   const data = await getJson(`/api/dataset/sample?dataset=${encodeURIComponent(dataset)}&split=train&class_name=${className}&limit=4`);
   const target = $("sampleGrid");
@@ -551,9 +551,9 @@ async function populateTestDatasets() {
     if (!option.disabled && firstEnabled === null) firstEnabled = dataset.path;
     datasetSelect.appendChild(option);
   }
-  // Default to the first available dataset (chest_Xray_patient, the leak-free
-  // split) rather than the training data_dir — keep the user's choice if still
-  // valid across refreshes.
+  // Default to the first available dataset (chest_Xray_NP_augmented, the
+  // leak-free patient split) rather than the training data_dir — keep the
+  // user's choice if still valid across refreshes.
   const options = [...datasetSelect.options];
   const keep = options.find((o) => o.value === previous && !o.disabled);
   datasetSelect.value = keep ? previous : (firstEnabled || datasetSelect.value);
@@ -634,7 +634,7 @@ async function runEvaluate() {
 }
 
 async function loadPredSamples() {
-  const dataset = $("testDataset").value || "dataset/chest_Xray_augmented";
+  const dataset = $("testDataset").value || "dataset/chest_Xray_NP_augmented";
   const split = $("predSplit").value;
   const className = $("predClass").value;
   const grid = $("predGrid");

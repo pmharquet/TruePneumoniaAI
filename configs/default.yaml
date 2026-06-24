@@ -1,12 +1,13 @@
 data:
-  data_dir: "dataset/chest_Xray_augmented"
+  data_dir: "dataset/chest_Xray_NP_augmented"
   image_size: 128 # sweet spot from the size sweep (~4x faster, <0.3pt accuracy loss)
   num_workers: 8
   prefetch_factor: 4
   batch_size: 128
-  # Fraction of train *source* images held out for validation. The split is
-  # grouped by source so augmented variants never leak across train/val.
-  val_split: 0.15
+  # NP datasets are patient-level re-splits, so the generated val/ is already a
+  # leak-free patient-disjoint split — use it directly instead of carving a
+  # second val out of train.
+  val_split: 0.0
   # Deterministic CLAHE on all splits — reduces train->test contrast shift.
   clahe: true
 

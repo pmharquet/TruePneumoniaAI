@@ -24,11 +24,12 @@ Classification binaire **NORMAL vs PNEUMONIA** sur radiographies thoraciques, av
 ## Structure du projet
 
 ```
-dataset/                   # tous les datasets
-├── chest_Xray/            # brut (train/val/test × NORMAL|PNEUMONIA)
-├── chest_Xray_augmented/  # binaire augmenté/letterboxé
-├── chest_Xray_patient/    # re-split patient-level sans fuite
-└── chest_Xray_subtype/    # BACTERIA|VIRUS (étage 2)
+dataset/                       # tous les datasets (re-split patient sans fuite)
+├── chest_Xray/                # brut (train/val/test × NORMAL|PNEUMONIA)
+├── chest_Xray_NP/             # binaire NORMAL|PNEUMONIA, letterboxé (sans aug)
+├── chest_Xray_NP_augmented/   # idem + augmentation offline (train équilibré)
+├── chest_Xray_VB/             # sous-type VIRUS|BACTERIA (étage 2, sans aug)
+└── chest_Xray_VB_augmented/   # idem + augmentation offline
 
 checkpoints/               # runs groupés par tâche
 ├── normal-pneumonia/<timestamp>/   # *.ckpt + config + events + state

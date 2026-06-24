@@ -72,13 +72,25 @@ Uniquement `LongestMaxSize` + `PadIfNeeded` + `Normalize` — pas d'augmentation
 Le script `src.data.generate_augmentations` permet de créer un dataset séparé, sans modifier `dataset/chest_Xray/` :
 
 ```bash
-# Tâche binaire (NORMAL vs PNEUMONIA)
-python -m src.data.generate_augmentations
-# Tâche sous-type (BACTERIA vs VIRUS, à partir des images PNEUMONIA)
-python -m src.data.generate_augmentations --task subtype --patient-split
+# NP — binaire NORMAL vs PNEUMONIA (re-split patient sans fuite)
+python -m src.data.generate_augmentations --task binary  --patient-split --mode none   # -> chest_Xray_NP (originaux seuls)
+python -m src.data.generate_augmentations --task binary  --patient-split               # -> chest_Xray_NP_augmented
+# VB — sous-type VIRUS vs BACTERIA (à partir des images PNEUMONIA)
+python -m src.data.generate_augmentations --task subtype --patient-split --mode none   # -> chest_Xray_VB
+python -m src.data.generate_augmentations --task subtype --patient-split               # -> chest_Xray_VB_augmented
 ```
 
-Par défaut, il écrit dans `dataset/chest_Xray_augmented/` (ou `dataset/chest_Xray_subtype/` pour `--task subtype`), convertit les images par letterbox avec padding noir, garde `val/` et `test/` sans augmentation, et équilibre `train/` en générant des variantes uniquement pour la classe minoritaire.
+Le nom de sortie encode la tâche (`NP` = binaire, `VB` = sous-type) et l'augmentation : le suffixe `_augmented` est ajouté sauf avec `--mode none`. Dans tous les cas les images sont letterboxées avec padding noir ; `val/` et `test/` ne sont jamais augmentés. `--patient-split` fusionne les splits d'origine et re-partitionne par patient (sans fuite). Les modes d'augmentation de `train/` :
+
+- `--mode none` : ne copie que les originaux préprocessés (aucune variante synthétique).
+- `--mode balance` (défaut) : amène chaque classe à la même cible. Par défaut la cible est l'effectif de la classe majoritaire (rééquilibrage simple) ; `--factor N` multiplie cette cible (`--factor 2` double chaque classe tout en la gardant équilibrée, `--factor 3` triple, etc.).
+- `--mode fixed` : ajoute `--copies-per-image N` variantes par image source, sans rééquilibrer (conserve le déséquilibre d'origine).
+
+Exemple — dataset NP équilibré **et** doublé :
+
+```bash
+python -m src.data.generate_augmentations --task binary --patient-split --factor 2
+```
 
 ---
 

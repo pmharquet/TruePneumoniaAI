@@ -8,7 +8,7 @@ Tous les hyperparamètres sont dans `configs/default.yaml` :
 
 ```yaml
 data:
-  data_dir: "dataset/chest_Xray_augmented"
+  data_dir: "dataset/chest_Xray_NP_augmented"
   image_size: 128
   batch_size: 128
   num_workers: 8
@@ -41,7 +41,7 @@ uvicorn src.dashboard.app:app --host 127.0.0.1 --port 8501
 
 Puis ouvrir [http://127.0.0.1:8501](http://127.0.0.1:8501).
 
-Le dashboard permet de choisir le dataset (`dataset/chest_Xray_augmented/`, `dataset/chest_Xray_subtype/`, …), les hyperparamètres, puis de suivre l'entraînement en temps réel : progression epoch/batch, loss, AUC, sensibilité, spécificité, logs et checkpoints. Le dataset sélectionné détermine la tâche (binaire NORMAL/PNEUMONIA ou sous-type BACTERIA/VIRUS) et donc la config, les classes et le dossier de checkpoints.
+Le dashboard permet de choisir le dataset (`dataset/chest_Xray_NP_augmented/`, `dataset/chest_Xray_VB_augmented/`, …), les hyperparamètres, puis de suivre l'entraînement en temps réel : progression epoch/batch, loss, AUC, sensibilité, spécificité, logs et checkpoints. Le dataset sélectionné détermine la tâche (binaire NORMAL/PNEUMONIA ou sous-type BACTERIA/VIRUS) et donc la config, les classes et le dossier de checkpoints.
 
 ---
 

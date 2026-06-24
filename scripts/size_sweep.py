@@ -30,7 +30,7 @@ def read_state(state_path: Path) -> dict:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="configs/patient.yaml")
+    parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--sizes", type=int, nargs="+", default=[224, 128, 64, 32])
     args = parser.parse_args()
 

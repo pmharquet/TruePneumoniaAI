@@ -47,19 +47,23 @@ SPLITS = ("train", "val", "test")
 # with the right label. Datasets not listed here fall back to the binary
 # NORMAL/PNEUMONIA task on DEFAULT_CONFIG.
 DATASET_CONFIG = {
-    "chest_Xray_subtype": ROOT / "configs" / "subtype.yaml",
+    "chest_Xray_VB": ROOT / "configs" / "subtype.yaml",
+    "chest_Xray_VB_augmented": ROOT / "configs" / "subtype.yaml",
 }
 DATASET_CLASSES = {
-    "chest_Xray_subtype": ("VIRUS", "BACTERIA"),
+    "chest_Xray_VB": ("VIRUS", "BACTERIA"),
+    "chest_Xray_VB_augmented": ("VIRUS", "BACTERIA"),
 }
 # Datasets are identified by their path relative to the project root
-# (e.g. "dataset/chest_Xray_subtype") so it can be passed straight to the
-# training data_dir and to ChestXrayDataset.
+# (e.g. "dataset/chest_Xray_VB_augmented") so it can be passed straight to the
+# training data_dir and to ChestXrayDataset. NP = NORMAL/PNEUMONIA (binary),
+# VB = VIRUS/BACTERIA (subtype); each comes preprocessed-only and _augmented.
 DATASETS = (
-    "dataset/chest_Xray_patient",
-    "dataset/chest_Xray_augmented",
+    "dataset/chest_Xray_NP_augmented",
+    "dataset/chest_Xray_NP",
+    "dataset/chest_Xray_VB_augmented",
+    "dataset/chest_Xray_VB",
     "dataset/chest_Xray",
-    "dataset/chest_Xray_subtype",
 )
 
 
@@ -209,8 +213,8 @@ def _available_datasets() -> list[dict[str, Any]]:
 
 
 def _default_data_dir() -> str:
-    augmented = DATASET_DIR / "chest_Xray_augmented"
-    return "dataset/chest_Xray_augmented" if augmented.exists() else "dataset/chest_Xray"
+    augmented = DATASET_DIR / "chest_Xray_NP_augmented"
+    return "dataset/chest_Xray_NP_augmented" if augmented.exists() else "dataset/chest_Xray"
 
 
 def _read_state(run_dir: Path | None) -> dict[str, Any]:
@@ -547,7 +551,7 @@ def stop_training() -> dict[str, Any]:
 
 @app.get("/api/dataset/sample")
 def dataset_sample(
-    dataset: str = Query(default="dataset/chest_Xray_augmented"),
+    dataset: str = Query(default="dataset/chest_Xray_NP_augmented"),
     split: str = Query(default="train"),
     class_name: str = Query(default="NORMAL"),
     limit: int = Query(default=4, ge=1, le=12),

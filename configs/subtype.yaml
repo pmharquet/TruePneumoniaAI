@@ -1,7 +1,7 @@
 # Stage-2 model: among PNEUMONIA cases, distinguish BACTERIAL vs VIRAL.
 # Same architecture/pipeline as the binary model — only the class layout differs.
 data:
-  data_dir: "dataset/chest_Xray_subtype" # leak-free patient-level re-split of PNEUMONIA images
+  data_dir: "dataset/chest_Xray_VB_augmented" # leak-free patient-level re-split of PNEUMONIA images
   image_size: 128
   num_workers: 8
   prefetch_factor: 4

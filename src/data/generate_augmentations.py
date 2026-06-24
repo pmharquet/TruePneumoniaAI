@@ -1,15 +1,23 @@
 """
-Generate an offline augmented chest X-ray dataset.
+Generate an offline preprocessed (optionally augmented) chest X-ray dataset.
 
-Default behavior is conservative:
-- reads from chest_Xray/
-- writes to chest_Xray_augmented/
-- copies train/val/test as letterboxed 224x224 JPEGs
-- augments only train/
-- balances train classes by augmenting the minority class only
+Reads from chest_Xray/ and writes a sibling dataset whose name encodes the task
+and whether train augmentation was applied:
+- binary  (NORMAL/PNEUMONIA): chest_Xray_NP  / chest_Xray_NP_augmented
+- subtype (VIRUS/BACTERIA):    chest_Xray_VB  / chest_Xray_VB_augmented
+
+The `_augmented` suffix is added unless `--mode none` is used. In every case the
+images are letterboxed to `--image-size` JPEGs; `--mode balance`/`fixed` then
+augment only train/, while `--mode none` copies the originals only:
+- balance: bring every class up to the same target (the majority count, or
+  `max_count * --factor` to also grow the dataset while staying balanced).
+- fixed:   add `--copies-per-image` augmented copies per source (no balancing).
 
 Usage:
-    python -m src.data.generate_augmentations
+    python -m src.data.generate_augmentations --task binary  --patient-split
+    python -m src.data.generate_augmentations --task binary  --patient-split --mode none
+    python -m src.data.generate_augmentations --task subtype --patient-split
+    python -m src.data.generate_augmentations --task subtype --patient-split --mode none
 """
 
 from __future__ import annotations
@@ -238,6 +246,7 @@ def generate_dataset(
     seed: int,
     jpeg_quality: int,
     overwrite: bool,
+    factor: float = 1.0,
     scheme: LabelScheme = SCHEMES["binary"],
     patient_split: bool = False,
     val_frac: float = 0.15,
@@ -314,13 +323,19 @@ def generate_dataset(
                         image_size,
                     )
 
-        if mode == "fixed":
+        if mode == "none":
+            # Preprocessed originals only — no synthetic augmentation.
+            plan = {}
+        elif mode == "fixed":
             plan = {
                 class_name: len(sources) * copies_per_image
                 for class_name, sources in train_sources.items()
             }
         elif mode == "balance":
-            target = max(len(sources) for sources in train_sources.values())
+            # Bring every class up to the same target so train/ is balanced;
+            # `factor` scales that target above the majority count to also grow
+            # the dataset (factor=2 -> every class doubled, still balanced).
+            target = round(max(len(sources) for sources in train_sources.values()) * factor)
             plan = {
                 class_name: target - len(sources)
                 for class_name, sources in train_sources.items()
@@ -372,6 +387,7 @@ def generate_dataset(
         "resize_strategy": "letterbox",
         "mode": mode,
         "copies_per_image": copies_per_image if mode == "fixed" else None,
+        "factor": factor if mode == "balance" else None,
         "seed": seed,
         "patient_split": patient_split,
         "val_frac": val_frac if patient_split else None,
@@ -406,12 +422,25 @@ def main() -> None:
         "--output",
         default=None,
         type=Path,
-        help="Defaults to dataset/chest_Xray_augmented (binary) or "
-        "dataset/chest_Xray_subtype (subtype).",
+        help="Defaults to dataset/chest_Xray_<NP|VB>[_augmented]: NP for binary, "
+        "VB for subtype; the _augmented suffix is dropped when --mode none.",
     )
     parser.add_argument("--image-size", default=128, type=int)
-    parser.add_argument("--mode", choices=("balance", "fixed"), default="balance")
+    parser.add_argument(
+        "--mode",
+        choices=("balance", "fixed", "none"),
+        default="balance",
+        help="balance/fixed augment train/; none = preprocessed originals only.",
+    )
     parser.add_argument("--copies-per-image", default=1, type=int)
+    parser.add_argument(
+        "--factor",
+        default=1.0,
+        type=float,
+        help="balance mode only: scale the balanced per-class target above the "
+        "majority count to grow the dataset (e.g. 2.0 doubles every class while "
+        "keeping them balanced). 1.0 = balance to the majority only.",
+    )
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--jpeg-quality", default=95, type=int)
     parser.add_argument("--overwrite", action="store_true")
@@ -425,10 +454,9 @@ def main() -> None:
     args = parser.parse_args()
 
     scheme = SCHEMES[args.task]
-    default_output = {
-        "binary": Path("dataset/chest_Xray_augmented"),
-        "subtype": Path("dataset/chest_Xray_subtype"),
-    }[args.task]
+    suffix = {"binary": "NP", "subtype": "VB"}[args.task]
+    name = f"chest_Xray_{suffix}" + ("" if args.mode == "none" else "_augmented")
+    default_output = Path("dataset") / name
     output = args.output if args.output is not None else default_output
 
     summary = generate_dataset(
@@ -440,6 +468,7 @@ def main() -> None:
         seed=args.seed,
         jpeg_quality=args.jpeg_quality,
         overwrite=args.overwrite,
+        factor=args.factor,
         scheme=scheme,
         patient_split=args.patient_split,
         val_frac=args.val_frac,
