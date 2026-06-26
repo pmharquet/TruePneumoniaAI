@@ -1,0 +1,47 @@
+data:
+  data_dir: "dataset/chest_Xray_NP_augmented"
+  image_size: 128 # sweet spot from the size sweep (~4x faster, <0.3pt accuracy loss)
+  num_workers: 8
+  prefetch_factor: 4
+  batch_size: 128
+  # NP datasets are patient-level re-splits, so the generated val/ is already a
+  # leak-free patient-disjoint split — use it directly instead of carving a
+  # second val out of train.
+  val_split: 0.0
+  # Deterministic CLAHE on all splits — reduces train->test contrast shift.
+  clahe: true
+
+model:
+  backbone: "densenet121" # densenet121 | resnet50
+  pretrained: true
+  num_classes: 1 # binary: NORMAL vs PNEUMONIA
+  dropout: 0.5
+
+training:
+  max_epochs: 30
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  # Regularization against train->test domain shift (see eval-methodology).
+  label_smoothing: 0.05  # keeps probabilities calibrated (less overconfidence)
+  freeze_backbone: true  # train only the last dense block + head
+  # pos_weight: weight for PNEUMONIA class (handles imbalance)
+  # computed dynamically from dataset in datamodule
+  precision: "16-mixed" # AMP for faster training on GPU
+  deterministic: false # false enables cudnn.benchmark (faster); true for reproducibility
+  compile: false # torch.compile the model (slower first batch, faster afterwards)
+
+threshold:
+  # Clinical context: prioritize sensitivity (recall on PNEUMONIA)
+  # Optimal threshold is tuned post-training on val AUC-ROC
+  default: 0.5
+  target_sensitivity: 0.95 # target recall for PNEUMONIA
+
+mlflow:
+  tracking_uri: "mlruns"
+  experiment_name: "TruePneumoniaAI-v0.2"
+
+paths:
+  # Per-task base dir. Each run nests under checkpoints/normal-pneumonia/<timestamp>/.
+  checkpoints: "checkpoints/normal-pneumonia"
+  onnx_export: "exports/model.onnx"
+  gradcam_output: "outputs/gradcam"

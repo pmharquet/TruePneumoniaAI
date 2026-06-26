@@ -1,0 +1,73 @@
+# Full stack — one command: `docker compose -f docker/docker-compose.yml up --build`
+#   dashboard -> http://localhost:8501   (pilote l'entraînement, GPU)
+#   mlflow    -> http://localhost:5000
+#   api       -> http://localhost:8000
+#
+# All Python services share a single image (built once by `dashboard`).
+
+services:
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: truepneumoniaai:latest
+    command: uvicorn src.dashboard.app:app --host 0.0.0.0 --port 8501
+    ports:
+      - "8501:8501"
+    # DataLoader workers + pin_memory need a large /dev/shm or they crash
+    # with "bus error". 64MB (default) is far too small.
+    shm_size: "8gb"
+    volumes:
+      # Live-mount source so code edits show up on container restart (no rebuild).
+      - ../src:/app/src
+      # Single mount for every dataset — new datasets under dataset/ are picked
+      # up automatically, no compose change needed.
+      - ../dataset:/app/dataset
+      # Per-task runs (ckpts + run data) live under checkpoints/<task>/<timestamp>/.
+      - ../checkpoints:/app/checkpoints
+      - ../exports:/app/exports
+      - ../outputs:/app/outputs
+      - ../mlruns:/app/mlruns
+      - ../configs:/app/configs
+    environment:
+      - PYTHONPATH=/app
+      - NO_ALBUMENTATIONS_UPDATE=1
+      - MLFLOW_ALLOW_FILE_STORE=true
+      - TPAI_CACHE_DIR=/app/outputs/cache
+      - TORCH_HOME=/app/outputs/cache/torch
+      - XDG_CACHE_HOME=/app/outputs/cache/xdg
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.14.0
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../mlruns:/mlruns
+    environment:
+      - MLFLOW_ALLOW_FILE_STORE=true
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri /mlruns
+
+  api:
+    # Reuses the image built by `dashboard` (same Dockerfile/context, cached).
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: truepneumoniaai:latest
+    command: uvicorn src.inference.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../checkpoints:/app/checkpoints:ro
+      - ../exports:/app/exports:ro
+      - ../configs:/app/configs:ro
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      - dashboard

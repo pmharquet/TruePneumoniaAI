@@ -1,0 +1,37 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# IDE
+.idea/
+.claude
+.vscode/
+*.iml
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Datasets (trop volumineux pour git)
+dataset/
+chest_Xray*/
+
+# artifacts
+checkpoints/
+exports/
+mlruns/
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Docs build
+site/
+
+# Logs / résultats
+outputs/
+outputs/cache/
+training_results/
