@@ -45,7 +45,7 @@ services:
               capabilities: [gpu]
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.13.0
+    image: ghcr.io/mlflow/mlflow:v3.14.0
     ports:
       - "5000:5000"
     volumes:
